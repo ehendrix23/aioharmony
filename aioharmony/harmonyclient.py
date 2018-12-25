@@ -466,7 +466,7 @@ class HarmonyClient:
         new_activity = None
         message_data = message.get('data')
         if message_data is not None:
-            new_activity = message_data.get('activityId')
+            new_activity = int(message_data.get('activityId'))
 
         if new_activity is None:
             await self._get_current_activity()
@@ -483,8 +483,7 @@ class HarmonyClient:
             call_callback(
                 callback_handler=self._new_activity_callback,
                 result=(self._current_activity,
-                        self.get_activity_name(
-                            activity_id=self._current_activity)
+                        self.get_activity_name(self._current_activity)
                         ),
                 callback_uuid=self._ip_address,
                 callback_name='new_activity_callback'
