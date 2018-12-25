@@ -502,7 +502,7 @@ class HarmonyClient:
         """
         _LOGGER.debug("%s: Starting activity %s (%s)",
                       self.name,
-                      self.get_activity_name(self._current_activity),
+                      self.get_activity_name(activity_id),
                       activity_id)
         params = {
             "async":      "true",
@@ -615,6 +615,10 @@ class HarmonyClient:
                 raise aioharmony.exceptions.HarmonyClientTimeOutException
             finally:
                 unregister_handlers()
+                _LOGGER.debug("%s: Start activity %s (%s) has been completed",
+                              self.name,
+                              self.get_activity_name(activity_id),
+                              activity_id)
 
         return status
 
@@ -693,6 +697,8 @@ class HarmonyClient:
                           self.name,
                           exc)
 
+        _LOGGER.debug("%s: Sending commands to HUB has been completed",
+                      self.name)
         return error_response_list
 
     async def _send_command(self,
@@ -747,6 +753,13 @@ class HarmonyClient:
                                msgid=msgid,
                                wait=False)
 
+        _LOGGER.debug("%s: Sending command %s to device %s (%s) with delay "
+                      "%ss has been completed",
+                      self.name,
+                      command.command,
+                      self.get_device_name(command.device),
+                      command.device,
+                      command.delay)
         return msgid
 
     def get_activity_id(self, activity_name) -> Optional[str]:
