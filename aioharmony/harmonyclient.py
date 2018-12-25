@@ -774,7 +774,7 @@ class HarmonyClient:
     def get_device_name(self, device_id) -> Optional[str]:
         """Find the device name for the provided ID."""
         item = search_dict(match_value=int(device_id),
-                           key='name_match',
+                           key='id',
                            search_list=self._devices)
         return item.get('name') if item else None
 
