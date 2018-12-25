@@ -281,7 +281,7 @@ class HarmonyClient:
         if self._config_updated_callback:
             call_callback(
                 callback_handler=self._config_updated_callback,
-                result=True,
+                result=self.config
                 callback_uuid=self._ip_address,
                 callback_name='config_updated_callback'
             )
@@ -425,7 +425,10 @@ class HarmonyClient:
         if self._new_activity_callback:
             call_callback(
                 callback_handler=self._new_activity_callback,
-                result=self._current_activity,
+                result=(self._current_activity,
+                        self.get_activity_name(
+                            activity_id=self._current_activity)
+                        ),
                 callback_uuid=self._ip_address,
                 callback_name='new_activity_callback'
             )
