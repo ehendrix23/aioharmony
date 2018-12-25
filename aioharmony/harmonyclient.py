@@ -750,7 +750,7 @@ class HarmonyClient:
                       command.delay)
         return msgid
 
-    def get_activity_id(self, activity_name) -> Optional[str]:
+    def get_activity_id(self, activity_name) -> Optional[int]:
         """Find the activity ID for the provided activity name."""
         item = search_dict(match_value=activity_name.lower(),
                            key='name_match',
@@ -759,12 +759,12 @@ class HarmonyClient:
 
     def get_activity_name(self, activity_id) -> Optional[str]:
         """Find the activity name for the provided ID."""
-        item = search_dict(match_value=activity_id,
+        item = search_dict(match_value=int(activity_id),
                            key='id',
                            search_list=self._activities)
         return item.get('name') if item else None
 
-    def get_device_id(self, device_name) -> Optional[str]:
+    def get_device_id(self, device_name) -> Optional[int]:
         """Find the device ID for the provided device name."""
         item = search_dict(match_value=device_name.lower(),
                            key='name_match',
@@ -773,7 +773,7 @@ class HarmonyClient:
 
     def get_device_name(self, device_id) -> Optional[str]:
         """Find the device name for the provided ID."""
-        item = search_dict(match_value=device_id,
+        item = search_dict(match_value=int(device_id),
                            key='name_match',
                            search_list=self._devices)
         return item.get('name') if item else None
