@@ -41,7 +41,7 @@ class HarmonyAPI:
                  new_activity_callback: CallbackType = None,
                  config_updated_callback: CallbackType = None,
                  loop=None):
-
+        _LOGGER.debug("%s: Initialize", ip_address)
         loop = loop if loop else asyncio.get_event_loop()
 
         self._harmony_client = HarmonyClient(

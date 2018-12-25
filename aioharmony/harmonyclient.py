@@ -91,6 +91,7 @@ class HarmonyClient:
                  new_activity_callback: CallbackType = None,
                  config_updated_callback: CallbackType = None,
                  loop=None):
+        _LOGGER.debug("%s: Initialize", ip_address)
         self._ip_address = ip_address
         self._connect_callback = connect_callback
         self._disconnect_callback = disconnect_callback
