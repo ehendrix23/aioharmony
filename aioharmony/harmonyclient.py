@@ -134,16 +134,9 @@ class HarmonyClient:
 
         # Create the notification handler object
         handler = copy.copy(handlers.HANDLER_NOTIFY)
-        .handler_obj = self._notification_callback
+        handler.handler_obj = self._notification_callback
         self._callback_handler.register_handler(
             handler=handler)
-
-        # Create the activity start handler object
-        sync_complete_handler = copy.copy(handlers.HANDLER_SYNC_COMPLETE)
-        sync_complete_handler.handler_obj = \
-            self._sync_completed_callback
-        self._callback_handler.register_handler(
-            handler=sync_complete_handler)
 
     @property
     def ip_address(self) -> str:
@@ -780,7 +773,7 @@ class HarmonyClient:
 
     def get_device_name(self, device_id) -> Optional[str]:
         """Find the device name for the provided ID."""
-        item = search_dict(match_value=device_id(),
+        item = search_dict(match_value=device_id,
                            key='name_match',
                            search_list=self._devices)
         return item.get('name') if item else None
