@@ -281,7 +281,7 @@ class HarmonyClient:
         if self._config_updated_callback:
             call_callback(
                 callback_handler=self._config_updated_callback,
-                result=self.config
+                result=self.config,
                 callback_uuid=self._ip_address,
                 callback_name='config_updated_callback'
             )
