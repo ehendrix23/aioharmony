@@ -107,6 +107,7 @@ class HarmonyClient:
         self._current_activity = None
         self._activities = None
         self._devices = None
+        self._hub_config_version = None
 
         # Get the queue on which JSON responses will be put
         self._response_queue = asyncio.Queue()
@@ -125,23 +126,17 @@ class HarmonyClient:
         # Create the lock for getting HUB information.
         self._sync_lck = asyncio.Lock()
 
-        # No sync active.
-        self._sync_in_progress = False
-
         # Create the activity start handler object
-        start_activity_finished_handler = copy.copy(
-            handlers.HANDLER_START_ACTIVITY_FINISHED)
-        start_activity_finished_handler.handler_obj = \
-            self._update_activity_callback
+        handler = copy.copy(handlers.HANDLER_START_ACTIVITY_FINISHED)
+        handler.handler_obj = self._update_activity_callback
         self._callback_handler.register_handler(
-            handler=start_activity_finished_handler)
+            handler=handler)
 
-        # Create the sync started handler object
-        sync_active_handler = copy.copy(handlers.HANDLER_SYNC_ACTIVE)
-        sync_active_handler.handler_obj = \
-            self._sync_started_callback
+        # Create the notification handler object
+        handler = copy.copy(handlers.HANDLER_NOTIFY)
+        .handler_obj = self._notification_callback
         self._callback_handler.register_handler(
-            handler=sync_active_handler)
+            handler=handler)
 
         # Create the activity start handler object
         sync_complete_handler = copy.copy(handlers.HANDLER_SYNC_COMPLETE)
@@ -156,7 +151,8 @@ class HarmonyClient:
 
     @property
     def name(self) -> Optional[str]:
-        return self.hub_info.get('friendlyName')
+        name = self.hub_info.get('friendlyName')
+        return name if name is not None else self._ip_address
 
     @property
     def connect_callback(self) -> CallbackType:
@@ -437,25 +433,24 @@ class HarmonyClient:
             )
         return True
 
-    def _sync_started_callback(self,
-                               _message: dict = None) -> None:
-        _LOGGER.debug("%s: A sync activity was started", self.name)
-        self._sync_in_progress = True
-
     # pylint: disable=broad-except
-    async def _sync_completed_callback(self,
-                                       _message: dict = None) -> None:
-        # If we did not get anything that a sync was in progress then just
-        # ignore.
-        if not self._sync_in_progress:
-            return
+    async def _notification_callback(self,
+                                     message: dict = None) -> None:
+        # We received a notification, check if the config version has changed.
+        _LOGGER.debug("%s: Notification was received", self.name)
+        resp_data = message.get('data')
+        if resp_data is not None:
+            current_hub_config_version = resp_data.get('configVersion')
 
-        _LOGGER.debug("%s: A sync activity was completed", self.name)
-
-        self._sync_in_progress = False
-
-        # Get all the HUB information.
-        await self.refresh_info_from_hub()
+            if current_hub_config_version is not None and \
+                    current_hub_config_version != self._hub_config_version:
+                _LOGGER.debug("%s: HUB configuration was updated, "
+                              "new version is: %s",
+                              self.name,
+                              current_hub_config_version)
+                # Get all the HUB information.
+                self._hub_config_version = current_hub_config_version
+                await self.refresh_info_from_hub()
 
     # pylint: disable=broad-except
     async def _update_activity_callback(self,

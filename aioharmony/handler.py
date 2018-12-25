@@ -173,29 +173,15 @@ class Handler:
 def dummy_callback(message):
     return message
 
-HANDLER_SYNC_ACTIVE = Handler(
+HANDLER_NOTIFY = Handler(
     handler_obj=dummy_callback,
     handler_name='Sync_Active',
     resp_json={
-        'type': re.compile(r'^connect\.stateDigest\?notify$'),
-        'data': {
-            'syncStatus': 1
-        }
+        'type': re.compile(r'^connect\.stateDigest\?notify$')
     },
     once=False
 )
 
-HANDLER_SYNC_COMPLETE = Handler(
-    handler_obj=dummy_callback,
-    handler_name='Sync_Active',
-    resp_json={
-        'type': re.compile(r'^connect\.stateDigest\?notify$'),
-        'data': {
-            'syncStatus': 0
-        }
-    },
-    once=False
-)
 
 HANDLER_START_ACTIVITY_FINISHED = Handler(
     handler_obj=dummy_callback,
