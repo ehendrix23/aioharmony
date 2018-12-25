@@ -77,6 +77,8 @@ SendCommandResponse = NamedTuple('SendCommandResponse',
 
 # TODO: Add docstyle comments
 # TODO: Clean up code styling
+# TODO: Add handler for connect so that we can update the HUB configuration
+#  anytime we connect
 
 # pylint: disable=too-many-public-methods
 # pylint: disable=too-many-instance-attributes
@@ -475,6 +477,18 @@ class HarmonyClient:
                       self.name,
                       self.get_activity_name(self._current_activity),
                       self._current_activity)
+
+        # If we were provided a callback handler then call it now.
+        if self._new_activity_callback:
+            call_callback(
+                callback_handler=self._new_activity_callback,
+                result=(self._current_activity,
+                        self.get_activity_name(
+                            activity_id=self._current_activity)
+                        ),
+                callback_uuid=self._ip_address,
+                callback_name='new_activity_callback'
+            )
 
     # pylint: disable=too-many-statements
     # pylint: disable=too-many-locals
