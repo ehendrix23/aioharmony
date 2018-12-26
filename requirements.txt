@@ -1,3 +1,2 @@
-async_timeout
+async_timeout>=3.0.1
 aiohttp>=3.4
-websockets>=6.0
