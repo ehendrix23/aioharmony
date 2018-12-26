@@ -170,6 +170,9 @@ class HarmonyClient:
                 if resp_data is not None:
                     self._hub_config_version = resp_data.get(
                         'configVersion')
+                    _LOGGER.debug("%s: HUB configuration version is: %s",
+                                  self.name,
+                                  self._hub_config_version)
 
         return True
 
@@ -406,13 +409,16 @@ class HarmonyClient:
                     sync_status == 1:
                 return
 
-            _LOGGER.debug("%s: HUB configuration was updated, "
-                          "new version is: %s",
-                          self.name,
-                          current_hub_config_version)
-            self._hub_config_version = current_hub_config_version
-            # Get all the HUB information.
-            await self.refresh_info_from_hub()
+            # Only do config update
+            if current_hub_config_version != self._hub_config_version:
+                _LOGGER.debug("%s: HUB configuration updated from version %s to "
+                              "%s",
+                              self.name,
+                              self._hub_config_version,
+                              current_hub_config_version)
+                self._hub_config_version = current_hub_config_version
+                # Get all the HUB information.
+                await self.refresh_info_from_hub()
 
     # pylint: disable=broad-except
     async def _update_activity_callback(self,
