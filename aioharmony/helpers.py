@@ -13,7 +13,7 @@ from aioharmony.handler import CallbackType
 
 _LOGGER = logging.getLogger(__name__)
 
-
+# TODO: Add this to Handler class instead?
 # pylint: disable=broad-except
 def call_callback(callback_handler: CallbackType,
                   result: object,

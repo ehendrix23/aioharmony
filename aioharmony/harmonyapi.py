@@ -15,16 +15,13 @@ import json
 import logging
 from datetime import datetime, timedelta
 from typing import List, Optional, Union
-
-from aioharmony.harmonyclient import (
-    HarmonyClient, SendCommandArg, SendCommandResponse, SendCommandDevice
+from aioharmony.const import (
+    SendCommandArg, SendCommandResponse, SendCommandDevice
 )
-from aioharmony.handler import CallbackType, Handler
+from aioharmony.harmonyclient import ClientCallbackType, HarmonyClient
+from aioharmony.handler import Handler
 
 _LOGGER = logging.getLogger(__name__)
-
-# Need this to allow anyone using API to be able to use it.
-SendCommandDevice = SendCommandDevice
 
 # TODO: Add docstyle comments
 # TODO: Clean up code styling
@@ -36,20 +33,14 @@ class HarmonyAPI:
     # pylint: disable=too-many-arguments
     def __init__(self,
                  ip_address: str,
-                 connect_callback: CallbackType = None,
-                 disconnect_callback: CallbackType = None,
-                 new_activity_callback: CallbackType = None,
-                 config_updated_callback: CallbackType = None,
-                 loop=None):
+                 callbacks: ClientCallbackType = None,
+                 loop: asyncio.AbstractEventLoop = None):
         _LOGGER.debug("%s: Initialize", ip_address)
         loop = loop if loop else asyncio.get_event_loop()
 
         self._harmony_client = HarmonyClient(
             ip_address=ip_address,
-            connect_callback=connect_callback,
-            disconnect_callback=disconnect_callback,
-            new_activity_callback=new_activity_callback,
-            config_updated_callback=config_updated_callback,
+            callbacks=callbacks,
             loop=loop
         )
 
@@ -79,7 +70,7 @@ class HarmonyAPI:
 
     @property
     def current_activity(self) -> tuple:
-        return self._harmony_client.current_activity_id,\
+        return self._harmony_client.current_activity_id, \
                self._harmony_client.get_activity_name(
                    self._harmony_client.current_activity_id)
 
@@ -120,36 +111,12 @@ class HarmonyAPI:
         return result
 
     @property
-    def connect_callback(self) -> CallbackType:
-        return self._harmony_client.connect_callback
+    def callbacks(self) -> ClientCallbackType:
+        return self._harmony_client.callbacks
 
-    @connect_callback.setter
-    def connect_callback(self, value: CallbackType) -> None:
-        self._harmony_client.connect_callback = value
-
-    @property
-    def disconnect_callback(self) -> CallbackType:
-        return self._harmony_client.disconnect_callback
-
-    @disconnect_callback.setter
-    def disconnect_callback(self, value: CallbackType) -> None:
-        self._harmony_client.disconnect_callback = value
-
-    @property
-    def new_activity_callback(self) -> CallbackType:
-        return self._harmony_client.new_activity_callback
-
-    @new_activity_callback.setter
-    def new_activity_callback(self, value: CallbackType) -> None:
-        self._harmony_client.new_activity_callback = value
-
-    @property
-    def config_updated_callback(self) -> CallbackType:
-        return self._harmony_client.config_updated_callback
-
-    @config_updated_callback.setter
-    def config_updated_callback(self, value: CallbackType) -> None:
-        self._harmony_client.config_updated_callback = value
+    @callbacks.setter
+    def callbacks(self, value: ClientCallbackType) -> None:
+        self._harmony_client.callbacks = value
 
     def get_activity_id(self, activity_name) -> Optional[str]:
         return self._harmony_client.get_activity_id(
@@ -216,7 +183,7 @@ class HarmonyAPI:
 
     async def sync(self) -> bool:
         """Syncs the harmony hub with the web service."""
-        _LOGGER.debug("%s: Performing sync")
+        _LOGGER.debug("%s: Performing sync", self.name)
         # Send the command to the HUB
         response = await self._harmony_client.send_to_hub(command='sync')
         if not response or response.get('code') != 200:
@@ -258,7 +225,7 @@ class HarmonyAPI:
 
         :param channel: Channel number
         :type channel: int
-        :return: True if successfull, False if unsuccessfull
+        :return: True if successfully, False if unsuccessfully
         :rtype: bool
         """
         _LOGGER.debug("%s: Changing channel to %s",

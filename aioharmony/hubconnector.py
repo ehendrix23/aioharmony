@@ -7,7 +7,7 @@ responses."""
 import asyncio
 import logging
 from contextlib import suppress
-from typing import Optional
+from typing import NamedTuple, Optional
 from urllib.parse import urlparse
 from uuid import uuid4
 
@@ -25,29 +25,31 @@ _LOGGER = logging.getLogger(__name__)
 
 
 # TODO: Need to see if I can further split this from protocol (web sockets,
-# xmpp) being used
-
+#  xmpp) being used
 # TODO: Add docstyle comments
-
 # TODO: Clean up code styling
 
+ConnectorCallbackType = NamedTuple('ConnectorCallbackType',
+                                   [('connect', Optional[CallbackType]),
+                                    ('disconnect', Optional[CallbackType])
+                                    ])
+
+# pylint: disable=too-many-instance-attributes
 class HubConnector:
     """An websocket client for connecting to the Logitech Harmony devices."""
 
     def __init__(self,
                  ip_address: str,
                  response_queue: asyncio.Queue,
-                 connect_callback: CallbackType = None,
-                 disconnect_callback: CallbackType = None,
-                 loop=None,
+                 callbacks: ConnectorCallbackType = None,
                  auto_reconnect=True):
         self._ip_address = ip_address
         self._response_queue = response_queue
-        self._connect_callback = connect_callback
-        self._disconnect_callback = disconnect_callback
-        self._loop = loop if loop else asyncio.get_event_loop()
+        self._callbacks = callbacks if callbacks is not None else \
+            ConnectorCallbackType(None, None)
         self._auto_reconnect = auto_reconnect
 
+        # TODO: Put this in a named tuple instead
         self._remote_id = None
         self._domain = DEFAULT_DOMAIN
 
@@ -61,20 +63,12 @@ class HubConnector:
         self._connected = False
 
     @property
-    def connect_callback(self) -> CallbackType:
-        return self._connect_callback
+    def callbacks(self) -> ConnectorCallbackType:
+        return self._callbacks
 
-    @connect_callback.setter
-    def connect_callback(self, value: CallbackType) -> None:
-        self._connect_callback = value
-
-    @property
-    def disconnect_callback(self) -> CallbackType:
-        return self._disconnect_callback
-
-    @disconnect_callback.setter
-    def disconnect_callback(self, value: CallbackType) -> None:
-        self._disconnect_callback = value
+    @callbacks.setter
+    def callbacks(self, value: ConnectorCallbackType) -> None:
+        self._callbacks = value
 
     async def close(self):
         """Close all connections and tasks
@@ -159,7 +153,7 @@ class HubConnector:
             # Set connected to True, disconnect sets this to False to
             # prevent automatic reconnect when disconnect is explicitly called
             self._connected = True
-            call_callback(callback_handler=self._connect_callback,
+            call_callback(callback_handler=self._callbacks.connect,
                           result=self._ip_address,
                           callback_uuid=self._ip_address,
                           callback_name='connected'
@@ -194,7 +188,7 @@ class HubConnector:
 
     async def _reconnect(self) -> None:
         """Perform reconnect to HUB if connection failed"""
-        call_callback(callback_handler=self._disconnect_callback,
+        call_callback(callback_handler=self._callbacks.disconnect,
                       result=self._ip_address,
                       callback_uuid=self._ip_address,
                       callback_name='disconnected'

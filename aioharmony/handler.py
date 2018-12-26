@@ -7,20 +7,12 @@ A number of HANDLER constants have been defined here, do not USE these,
 copy them instead.
 
 """
-import asyncio
 import copy
 import re
 from datetime import timedelta
-from typing import Any, Callable, Optional, Union
-
+from aioharmony.const import CallbackType
 
 DEFAULT_TIMEOUT = 60
-
-CallbackType = Union[
-    asyncio.Future,
-    asyncio.Event,
-    Callable[[object, Optional[Any]], Any]
-]
 
 
 class Handler:
@@ -161,6 +153,7 @@ class Handler:
         """"""
         self._expiration = value
 
+
 #
 #
 # Define a number of common handlers.
@@ -173,15 +166,15 @@ class Handler:
 def dummy_callback(message):
     return message
 
+
 HANDLER_NOTIFY = Handler(
     handler_obj=dummy_callback,
-    handler_name='Sync_Active',
+    handler_name='Notification_Received',
     resp_json={
         'type': re.compile(r'^connect\.stateDigest\?notify$')
     },
     once=False
 )
-
 
 HANDLER_START_ACTIVITY_FINISHED = Handler(
     handler_obj=dummy_callback,

@@ -9,7 +9,6 @@ the HUB through callbacks.
 
 import asyncio
 import logging
-import copy
 from typing import (
     List, NamedTuple, Optional, Pattern, Union, Tuple
 )
@@ -202,7 +201,7 @@ class ResponseHandler:
         for handler in self._handler_list:
 
             if handler.msgid is not None:
-                if message.get('id') is None or\
+                if message.get('id') is None or \
                         message.get('id') != handler.msgid:
                     _LOGGER.debug("No match on msgid for %s",
                                   handler.handler.handler_name)
@@ -249,7 +248,7 @@ class ResponseHandler:
                                   "expired, removing: %s",
                                   handler.handler.handler_name,
                                   handler.handler_uuid,
-                                  handler.expiration)
+                                  handler.expiration.astimezone())
                     self.unregister_handler(handler.handler_uuid)
                     removed_expired = True
 
