@@ -19,8 +19,8 @@ from async_timeout import timeout
 import aioharmony.exceptions as aioexc
 import aioharmony.handler as handlers
 from aioharmony.const import (
-    CallbackType, HUB_COMMANDS, SendCommand, SendCommandDevice,
-    SendCommandResponse
+    CallbackType, ClientConfigType, HUB_COMMANDS, SendCommand,
+    SendCommandDevice, SendCommandResponse
 )
 from aioharmony.helpers import call_callback, search_dict
 from aioharmony.hubconnector import HubConnector, ConnectorCallbackType
@@ -53,17 +53,10 @@ class HarmonyClient:
         self._ip_address = ip_address
         self._callbacks = callbacks if callbacks is not None else \
             ClientCallbackType(None, None, None, None)
-
         self._loop = loop if loop else asyncio.get_event_loop()
 
-        self._hub_info_dict = {}
-
-        # TODO: Made the configuration elements a named tuple instead
-        self._config = None
-        self._current_activity = None
-        self._activities = None
-        self._devices = None
-        self._hub_config_version = None
+        self._hub_config = ClientConfigType({}, {}, None, [], [])
+        self._current_activity_id = None
 
         # Get the queue on which JSON responses will be put
         self._response_queue = asyncio.Queue()
@@ -103,8 +96,12 @@ class HarmonyClient:
 
     @property
     def name(self) -> Optional[str]:
-        name = self.hub_info.get('friendlyName')
+        name = self._hub_config.info.get('friendlyName')
         return name if name is not None else self._ip_address
+
+    @property
+    def hub_config(self) -> ClientConfigType:
+        return self._hub_config
 
     @property
     def callbacks(self) -> ClientCallbackType:
@@ -119,16 +116,8 @@ class HarmonyClient:
         )
 
     @property
-    def config(self) -> dict:
-        return self._config
-
-    @property
-    def current_activity_id(self) -> int:
-        return self._current_activity
-
-    @property
-    def hub_info(self) -> dict:
-        return self._hub_info_dict
+    def current_activity_id(self):
+        return self._current_activity_id
 
     async def connect(self) -> bool:
         """
@@ -168,11 +157,11 @@ class HarmonyClient:
             if idx == 0:
                 resp_data = result.get('data')
                 if resp_data is not None:
-                    self._hub_config_version = resp_data.get(
-                        'configVersion')
+                    self._hub_config = self._hub_config._replace(
+                        config_version=resp_data.get('configVersion'))
                     _LOGGER.debug("%s: HUB configuration version is: %s",
                                   self.name,
-                                  self._hub_config_version)
+                                  self._hub_config.config_version)
 
         return True
 
@@ -240,7 +229,7 @@ class HarmonyClient:
         if self._callbacks.config_updated:
             call_callback(
                 callback_handler=self._callbacks.config_updated,
-                result=self.config,
+                result=self._hub_config.config,
                 callback_uuid=self._ip_address,
                 callback_name='config_updated_callback'
             )
@@ -267,23 +256,26 @@ class HarmonyClient:
                           self._ip_address)
             return None
 
-        self._config = response.get('data')
+        self._hub_config = self._hub_config._replace(
+            config=response.get('data'))
 
-        self._activities = list(
-            {
-                'name':       a['label'],
-                'name_match': a['label'].lower(),
-                'id':         int(a['id'])
-            } for a in self._config.get('activity'))
+        self._hub_config = self._hub_config._replace(
+            activities=list(
+                {
+                    'name':           a['label'],
+                    'name_lowercase': a['label'].lower(),
+                    'id':             int(a['id'])
+                } for a in self._hub_config.config.get('activity')))
 
-        self._devices = list(
-            {
-                'name':       a['label'],
-                'name_match': a['label'].lower(),
-                'id':         int(a['id'])
-            } for a in self._config.get('device'))
+        self._hub_config = self._hub_config._replace(
+            devices=list(
+                {
+                    'name':           a['label'],
+                    'name_lowercase': a['label'].lower(),
+                    'id':             int(a['id'])
+                } for a in self._hub_config.config.get('device')))
 
-        return self._config
+        return self._hub_config.config
 
     async def _retrieve_hub_info(self) -> Optional[dict]:
         """Retrieve some information from the Hub."""
@@ -293,8 +285,9 @@ class HarmonyClient:
         except asyncio.TimeoutError:
             raise aioexc.HarmonyClientTimeOutException
 
-        self._hub_info_dict = response
-        return self._hub_info_dict
+        self._hub_config = self._hub_config._replace(
+            info=response)
+        return self._hub_config.info
 
     async def send_to_hub(self,
                           command: str,
@@ -374,19 +367,19 @@ class HarmonyClient:
                           self._ip_address)
             return False
 
-        self._current_activity = int(response['data']['result'])
+        self._current_activity_id = int(response['data']['result'])
         _LOGGER.debug("%s: Current activity: %s(%s)",
                       self.name,
-                      self.get_activity_name(self._current_activity),
-                      self._current_activity)
+                      self.get_activity_name(self._current_activity_id),
+                      self._current_activity_id)
 
         # If we were provided a callback handler then call it now.
         if self._callbacks.new_activity:
             call_callback(
                 callback_handler=self._callbacks.new_activity,
-                result=(self._current_activity,
+                result=(self._current_activity_id,
                         self.get_activity_name(
-                            activity_id=self._current_activity)
+                            activity_id=self._current_activity_id)
                         ),
                 callback_uuid=self._ip_address,
                 callback_name='new_activity_callback'
@@ -410,13 +403,15 @@ class HarmonyClient:
                 return
 
             # Only do config update
-            if current_hub_config_version != self._hub_config_version:
-                _LOGGER.debug("%s: HUB configuration updated from version %s to "
-                              "%s",
+            if current_hub_config_version != \
+                    self._hub_config.config_version:
+                _LOGGER.debug("%s: HUB configuration updated from version "
+                              "%s to %s",
                               self.name,
-                              self._hub_config_version,
+                              self._hub_config.config_version,
                               current_hub_config_version)
-                self._hub_config_version = current_hub_config_version
+                self._hub_config = self._hub_config._replace(
+                    config_version=current_hub_config_version)
                 # Get all the HUB information.
                 await self.refresh_info_from_hub()
 
@@ -435,18 +430,19 @@ class HarmonyClient:
             await self._get_current_activity()
             return
 
-        self._current_activity = new_activity
+        self._current_activity_id = new_activity
         _LOGGER.debug("%s: New activity: %s(%s)",
                       self.name,
-                      self.get_activity_name(self._current_activity),
-                      self._current_activity)
+                      self.get_activity_name(self._current_activity_id),
+                      self._current_activity_id)
 
         # If we were provided a callback handler then call it now.
         if self._callbacks.new_activity:
             call_callback(
                 callback_handler=self._callbacks.new_activity,
-                result=(self._current_activity,
-                        self.get_activity_name(self._current_activity)
+                result=(self._current_activity_id,
+                        self.get_activity_name(
+                            self._current_activity_id)
                         ),
                 callback_uuid=self._ip_address,
                 callback_name='new_activity_callback'
@@ -642,6 +638,9 @@ class HarmonyClient:
                                     msgid)
                     continue
 
+                if isinstance(command_sent, (float, int)):
+                    continue
+
                 _LOGGER.debug("%s: Received code %s for command %s to device "
                               "%s: %s",
                               self.name,
@@ -728,29 +727,29 @@ class HarmonyClient:
     def get_activity_id(self, activity_name) -> Optional[int]:
         """Find the activity ID for the provided activity name."""
         item = search_dict(match_value=activity_name.lower(),
-                           key='name_match',
-                           search_list=self._activities)
+                           key='name_lowercase',
+                           search_list=self._hub_config.activities)
         return item.get('id') if item else None
 
     def get_activity_name(self, activity_id) -> Optional[str]:
         """Find the activity name for the provided ID."""
         item = search_dict(match_value=int(activity_id),
                            key='id',
-                           search_list=self._activities)
+                           search_list=self._hub_config.activities)
         return item.get('name') if item else None
 
     def get_device_id(self, device_name) -> Optional[int]:
         """Find the device ID for the provided device name."""
         item = search_dict(match_value=device_name.lower(),
-                           key='name_match',
-                           search_list=self._devices)
+                           key='name_lowercase',
+                           search_list=self._hub_config.activities)
         return item.get('id') if item else None
 
     def get_device_name(self, device_id) -> Optional[str]:
         """Find the device name for the provided ID."""
         item = search_dict(match_value=int(device_id),
                            key='id',
-                           search_list=self._devices)
+                           search_list=self._hub_config.activities)
         return item.get('name') if item else None
 
     def register_handler(self, *args, **kwargs) -> str:

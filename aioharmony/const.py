@@ -60,6 +60,14 @@ CallbackType = Union[
     Callable[[object, Optional[Any]], Any]
 ]
 
+ClientConfigType = NamedTuple('ClientConfigType',
+                              [('config', dict),
+                               ('info', dict),
+                               ('config_version', int),
+                               ('activities', List[dict]),
+                               ('devices', List[dict])
+                               ])
+
 # Type for a command to send to the HUB
 SendCommandDevice = NamedTuple('SendCommandDevice',
                                [('device', int),

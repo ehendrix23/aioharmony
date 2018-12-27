@@ -16,12 +16,16 @@ import logging
 from datetime import datetime, timedelta
 from typing import List, Optional, Union
 from aioharmony.const import (
-    SendCommandArg, SendCommandResponse, SendCommandDevice
+    ClientConfigType, SendCommandArg, SendCommandDevice, SendCommandResponse
 )
 from aioharmony.harmonyclient import ClientCallbackType, HarmonyClient
 from aioharmony.handler import Handler
 
 _LOGGER = logging.getLogger(__name__)
+
+# Making these types available for import.
+ClientConfigType = ClientConfigType
+SendCommandDevice = SendCommandDevice
 
 # TODO: Add docstyle comments
 # TODO: Clean up code styling
@@ -49,8 +53,8 @@ class HarmonyAPI:
         return self._harmony_client.ip_address
 
     @property
-    def hub_info(self) -> dict:
-        return self._harmony_client.hub_info
+    def hub_config(self) -> ClientConfigType:
+        return self._harmony_client.hub_config
 
     @property
     def name(self) -> Optional[str]:
@@ -58,15 +62,15 @@ class HarmonyAPI:
 
     @property
     def email(self) -> Optional[str]:
-        return self.hub_info.get('email')
+        return self.hub_config.info.get('email')
 
     @property
     def account_id(self) -> Optional[str]:
-        return self.hub_info.get('accountId')
+        return self.hub_config.info.get('accountId')
 
     @property
     def fw_version(self) -> Optional[str]:
-        return self.hub_info.get('current_fw_version')
+        return self.hub_config.info.get('current_fw_version')
 
     @property
     def current_activity(self) -> tuple:
@@ -76,7 +80,7 @@ class HarmonyAPI:
 
     @property
     def config(self) -> dict:
-        return self._harmony_client.config
+        return self.hub_config.config
 
     @property
     def json_config(self) -> dict:

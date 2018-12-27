@@ -49,7 +49,6 @@ class HubConnector:
             ConnectorCallbackType(None, None)
         self._auto_reconnect = auto_reconnect
 
-        # TODO: Put this in a named tuple instead
         self._remote_id = None
         self._domain = DEFAULT_DOMAIN
 
