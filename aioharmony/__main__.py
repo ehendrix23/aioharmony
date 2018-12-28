@@ -14,15 +14,11 @@ import aioharmony.exceptions
 from aioharmony.harmonyapi import HarmonyAPI, SendCommandDevice
 from aioharmony.responsehandler import Handler
 
-client = None
-
-
 # TODO: Add docstyle comments
 # TODO: Clean up code styling
 
 
 async def get_client(ip_address, show_responses) -> Optional[HarmonyAPI]:
-    global client
     client = HarmonyAPI(ip_address)
 
     def output_response(message):
@@ -46,7 +42,7 @@ async def get_client(ip_address, show_responses) -> Optional[HarmonyAPI]:
     return None
 
 
-async def just_listen(_args=None):
+async def just_listen(client, _):
     # Create handler to output everything.
     print("Starting to listen on HUB {} with firmware version {}".format(
         client.name,
@@ -54,13 +50,8 @@ async def just_listen(_args=None):
 
 
 # Functions for use on command line
-async def show_config(_args=None):
+async def show_config(client, _):
     """Connects to the Harmony and return current configuration.
-
-    Args:
-        args (argparse): Argparse object containing required variables from
-        command line
-
     """
     config = client.config
 
@@ -70,13 +61,8 @@ async def show_config(_args=None):
         print("There was a problem retrieving the configuration")
 
 
-async def show_detailed_config(_args=None):
+async def show_detailed_config(client, _):
     """Connects to the Harmony and return current configuration.
-
-    Args:
-        args (argparse): Argparse object containing required variables from
-        command line
-
     """
     config = client.config
 
@@ -87,13 +73,8 @@ async def show_detailed_config(_args=None):
         print("There was a problem retrieving the configuration")
 
 
-async def show_current_activity(_args=None):
+async def show_current_activity(client, _):
     """Returns Harmony hub's current activity.
-
-    Args:
-        args (argparse): Argparse object containing required variables from
-        command line
-
     """
     activity_id, activity_name = client.current_activity
 
@@ -105,7 +86,7 @@ async def show_current_activity(_args=None):
         print('Unable to retrieve current activity')
 
 
-async def start_activity(args):
+async def start_activity(client, args):
     """Connects to Harmony Hub and starts an activity
 
     Args:
@@ -120,7 +101,6 @@ async def start_activity(args):
     if (args.activity.isdigit()) or (args.activity == '-1'):
         activity_id = args.activity
     else:
-        await client.get_config()
         activity_id = client.get_activity_id(args.activity)
         if activity_id:
             print('Found activity named %s (id %s)' % (args.activity,
@@ -135,13 +115,8 @@ async def start_activity(args):
             print('Activity start failed: ', status[1])
 
 
-async def power_off(_args=None):
+async def power_off(client, _):
     """Power off Harmony Hub.
-
-    Args:
-        args (argparse): Argparse object containing required variables from
-        command line
-
     """
     status = await client.power_off()
 
@@ -151,7 +126,7 @@ async def power_off(_args=None):
         print('Power off failed')
 
 
-async def send_command(args):
+async def send_command(client, args):
     """Connects to the Harmony and send a simple command.
 
     Args:
@@ -159,10 +134,17 @@ async def send_command(args):
         command line
 
     """
+    device_id = None
     if args.device_id.isdigit():
-        device_id = args.device_id
-    else:
-        device_id = client.get_device_id(args.device_id)
+        if client.get_device_name(int(args.device_id)):
+            device_id = args.device_id
+
+    if device_id is None:
+        device_id = client.get_device_id(str(args.device_id).strip())
+
+    if device_id is None:
+        print("Device %s is invalid.".format(args.device_id))
+        return
 
     snd_cmmnd = SendCommandDevice(
         device=device_id,
@@ -170,27 +152,26 @@ async def send_command(args):
         delay=args.hold_secs)
 
     snd_cmmnd_list = []
-    for i in range(args.repeat_num):
+    for _ in range(args.repeat_num):
         snd_cmmnd_list.append(snd_cmmnd)
         if args.delay_secs > 0:
             snd_cmmnd_list.append(args.delay_secs)
 
     result_list = await client.send_commands(snd_cmmnd_list)
 
-    if len(result_list) > 0:
+    if not result_list:
         for result in result_list:
             print("Sending of command {} to device {} failed with code {}: "
                   "{}".format(
                       result.command.command,
                       result.command.device,
                       result.code,
-                      result.msg
-            ))
+                      result.msg))
     else:
         print('Command Sent')
 
 
-async def change_channel(args):
+async def change_channel(client, args):
     """Change channel
 
     Args:
@@ -211,7 +192,7 @@ async def change_channel(args):
 #     pprint(hubs)
 
 
-async def sync(_args=None):
+async def sync(client, _):
     """Syncs Harmony hub to web service.
     Args:
         args (argparse): Argparse object containing required variables from
@@ -228,7 +209,7 @@ async def sync(_args=None):
         print("Sync failed")
 
 
-async def run():
+async def run(client):
     """Main method for the script."""
     parser = argparse.ArgumentParser(
         description='Pyharmony - Harmony device control',
@@ -355,29 +336,28 @@ async def run():
         pass
     else:
         coroutine = None
-        if hasattr(args, 'func'):
-            coroutine = args.func(args)
-        else:
-            if not args.show_responses:
-                parser.print_help()
-                return
+        if not hasattr(args, 'func') and not args.show_responses:
+            parser.print_help()
+            return
 
-        global client
         # Connect to the HUB
         try:
-            global client
-            client = await get_client(args.harmony_ip, args.show_responses)
+            client = await get_client(args.harmony_ip,
+                                      args.show_responses)
             if client is None:
                 return
-        except aioharmony.exceptions.HarmonyClientTimeOutException:
+        except aioharmony.exceptions.TimeOut:
             print("Action did not complete within a reasonable time.")
             raise
+
+        if hasattr(args, 'func'):
+            coroutine = args.func(client, args)
 
         # Execute provided request.
         try:
             if coroutine is not None:
                 await coroutine
-        except aioharmony.exceptions.HarmonyClientTimeOutException:
+        except aioharmony.exceptions.TimeOut:
             print("Action did not complete within a reasonable time.")
             raise
 
@@ -395,9 +375,9 @@ async def run():
 
 def main() -> None:
     loop = asyncio.new_event_loop()
-    global client
+    client = None
     try:
-        loop.run_until_complete(run())
+        loop.run_until_complete(run(client))
         while asyncio.all_tasks(loop):
             loop.run_until_complete(asyncio.gather(*asyncio.all_tasks(loop)))
         loop.close()

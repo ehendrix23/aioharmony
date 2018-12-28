@@ -2,13 +2,18 @@
 Define the exception classes for aioharmony module.
 """
 
-class HarmonyClientException(Exception):
+
+class HarmonyException(Exception):
+    """Top level Harmony Exception"""
+
+
+class HarmonyClient(HarmonyException):
     """
-    Root class exception
+    Top level exception for HarmonyClient
     """
 
 
-class HarmonyClientTimeOutException(HarmonyClientException, TimeoutError):
+class TimeOut(HarmonyClient, TimeoutError):
     """
     Raised on timeouts
     """

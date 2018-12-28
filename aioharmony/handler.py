@@ -7,7 +7,6 @@ A number of HANDLER constants have been defined here, do not USE these,
 copy them instead.
 
 """
-import copy
 import re
 from datetime import timedelta
 from aioharmony.const import CallbackType

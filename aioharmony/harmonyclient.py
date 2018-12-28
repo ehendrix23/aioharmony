@@ -49,7 +49,7 @@ class HarmonyClient:
                  ip_address: str,
                  callbacks: ClientCallbackType = None,
                  loop: asyncio.AbstractEventLoop = None):
-        _LOGGER.debug("%s: Initialize", ip_address)
+        _LOGGER.debug("%s: Initialize HUB on ", ip_address)
         self._ip_address = ip_address
         self._callbacks = callbacks if callbacks is not None else \
             ClientCallbackType(None, None, None, None)
@@ -124,14 +124,14 @@ class HarmonyClient:
 
         :return: True if connection was successful, False if it was not.
         :rtype: bool
-        :raises: :class:`~aioharmony.exceptions.HarmonyClientTimeOutException`
+        :raises: :class:`~aioharmony.exceptions.TimeOut`
         """
         try:
             with timeout(DEFAULT_TIMEOUT):
                 if not await self._hub_connection.connect():
                     return False
         except asyncio.TimeoutError:
-            raise aioexc.HarmonyClientTimeOutException
+            raise aioexc.TimeOut
 
         # Initiate a sync. That will then result in our notification handler
         # to receive the response and set our current config version
@@ -146,7 +146,7 @@ class HarmonyClient:
             if isinstance(result, Exception):
                 if not isinstance(
                         result,
-                        aioexc.HarmonyClientTimeOutException):
+                        aioexc.TimeOut):
                     raise result
 
                 if idx == 0:
@@ -176,14 +176,14 @@ class HarmonyClient:
                 with timeout(DEFAULT_TIMEOUT):
                     await self._hub_connection.close()
             except asyncio.TimeoutError:
-                raise aioexc.HarmonyClientTimeOutException
+                raise aioexc.TimeOut
 
         if self._callback_handler:
             try:
                 with timeout(DEFAULT_TIMEOUT):
                     await self._callback_handler.close()
             except asyncio.TimeoutError:
-                raise aioexc.HarmonyClientTimeOutException
+                raise aioexc.TimeOut
 
     async def disconnect(self) -> None:
         """Disconnect from Hub"""
@@ -194,22 +194,27 @@ class HarmonyClient:
             with timeout(DEFAULT_TIMEOUT):
                 await self._hub_connection.disconnect()
         except asyncio.TimeoutError:
-            raise aioexc.HarmonyClientTimeOutException
+            raise aioexc.TimeOut
 
     async def refresh_info_from_hub(self) -> None:
         _LOGGER.debug("%s: Retrieving HUB information",
                       self.name)
 
         async with self._sync_lck:
-            results = await asyncio.gather(self._get_config(),
-                                           self._retrieve_hub_info(),
-                                           self._get_current_activity(),
-                                           return_exceptions=True
-                                           )
+            try:
+                with timeout(DEFAULT_TIMEOUT):
+                    results = await asyncio.gather(
+                        self._get_config(),
+                        self._retrieve_hub_info(),
+                        self._get_current_activity(),
+                        return_exceptions=True
+                    )
+            except asyncio.TimeoutError:
+                raise aioexc.TimeOut
             for idx, result in enumerate(results):
                 if isinstance(
                         result,
-                        aioexc.HarmonyClientTimeOutException):
+                        aioexc.TimeOut):
                     # Timeout exception, just put out error then.
                     if idx == 0:
                         result_name = 'config'
@@ -283,7 +288,7 @@ class HarmonyClient:
             with timeout(DEFAULT_TIMEOUT):
                 response = await self._hub_connection.retrieve_hub_info()
         except asyncio.TimeoutError:
-            raise aioexc.HarmonyClientTimeOutException
+            raise aioexc.TimeOut
 
         self._hub_config = self._hub_config._replace(
             info=response)
@@ -329,7 +334,7 @@ class HarmonyClient:
                     # There was an issue
                     return False
         except asyncio.TimeoutError:
-            raise aioexc.HarmonyClientTimeOutException
+            raise aioexc.TimeOut
 
         if not wait:
             return True
@@ -339,7 +344,7 @@ class HarmonyClient:
             with timeout(DEFAULT_TIMEOUT):
                 await response
         except asyncio.TimeoutError:
-            raise aioexc.HarmonyClientTimeOutException
+            raise aioexc.TimeOut
 
         return response.result()
 
@@ -350,7 +355,7 @@ class HarmonyClient:
         # Send the command to the HUB
         try:
             response = await self.send_to_hub(command='get_current_activity')
-        except aioexc.HarmonyClientTimeOutException:
+        except aioexc.TimeOut:
             _LOGGER.error("%s: Timeout trying to retrieve current activity.",
                           self.name)
             response = None
@@ -571,7 +576,7 @@ class HarmonyClient:
                 with timeout(DEFAULT_TIMEOUT):
                     status = await activity_completed
             except asyncio.TimeoutError:
-                raise aioexc.HarmonyClientTimeOutException
+                raise aioexc.TimeOut
             finally:
                 unregister_handlers()
                 _LOGGER.debug("%s: Start activity %s (%s) has been completed",
@@ -658,6 +663,7 @@ class HarmonyClient:
             _LOGGER.debug("%s: Timed out waiting for send command errors: %s",
                           self.name,
                           exc)
+            raise aioexc.TimeOut
 
         _LOGGER.debug("%s: Sending commands to HUB has been completed",
                       self.name)
@@ -742,14 +748,14 @@ class HarmonyClient:
         """Find the device ID for the provided device name."""
         item = search_dict(match_value=device_name.lower(),
                            key='name_lowercase',
-                           search_list=self._hub_config.activities)
+                           search_list=self._hub_config.devices)
         return item.get('id') if item else None
 
     def get_device_name(self, device_id) -> Optional[str]:
         """Find the device name for the provided ID."""
         item = search_dict(match_value=int(device_id),
                            key='id',
-                           search_list=self._hub_config.activities)
+                           search_list=self._hub_config.devices)
         return item.get('name') if item else None
 
     def register_handler(self, *args, **kwargs) -> str:
