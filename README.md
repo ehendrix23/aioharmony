@@ -1,76 +1,90 @@
-pyharmony
+aioharmony
 =======
 
 Python library for programmatically using a Logitech Harmony Link or Ultimate Hub.
 
-A fork of [bkanuka/pyharmony](https://github.com/bkanuka/pyharmony) with the intent to:
-- Make pip/setup.py installable.
-- Unify improvments made in other forks.
-- Configurable for Harmony Link/Hub differences.
-- Better practices for project layout.
-- Better error handling!
-- Inclusion into Home Assistant (https://home-assistant.io)
+This library originated from [iandday/pyharmony](https://github.com/iandday/pyharmony) which was a fork 
+of [bkanuka/pyharmony](https://github.com/bkanuka/pyharmony) with the intent to:
+
+- Make the harmony library asyncio
+- Ability to provide one's own custom callbacks to be called
+- Automatic reconnect, even if re-connection cannot be established for a time
+- More easily get the HUB configuration through API call
+- Additional callbacks: connect, disconnect, HUB configuration updated
+- Using unique msgid's ensuring that responses from the HUB are correctly managed. 
 
 Protocol
 --------
 
-As the harmony protocol is being worked out, notes are in PROTOCOL.md.
+As the harmony protocol is being worked out, notes will be in PROTOCOL.md. Currently it is using web sockets 
+due to a change by Logitech. Logitech has informed they will re-open XMPP sometime in January/2019. Once re-opened
+this library will be moved to use XMPP. 
 
 Status
 ------
 
-* Authentication to Logitech's web service working.
-* Authentication to harmony device working.
+* Retrieving current activity
 * Querying for entire device information
 * Querying for activity information only
 * Querying for current activity
 * Starting Activity
 * Sending Command
+* Changing channels
+* Custom callbacks.
 
 Usage
 -----
 
-Pyharmony - Harmony device control
+aioharmony - Harmony device control
 
 ```
-usage: harmony [-h] (--harmony_ip HARMONY_IP | --discover)
-               [--harmony_port HARMONY_PORT]
-               [--loglevel {CRITICAL,ERROR,DEBUG,WARNING,INFO}]
-               {show_config,show_current_activity,start_activity,power_off,sync,send_command}
-               ...
+usage: aioharmony [-h] (--harmony_ip HARMONY_IP | --discover)
+                  [--harmony_port HARMONY_PORT]
+                  [--loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
+                  [--show_responses | --no-show_responses] [--wait WAIT]
+                  {show_config,show_detailed_config,show_current_activity,start_activity,power_off,sync,listen,send_command,change_channel}
+                  ...
 
-Pyharmony - Harmony device control
+aioharmony - Harmony device control
 
 positional arguments:
-  {show_config,show_current_activity,start_activity,power_off,sync,send_command}
+  {show_config,show_detailed_config,show_current_activity,start_activity,power_off,sync,listen,send_command,change_channel}
     show_config         Print the Harmony device configuration.
+    show_detailed_config
+                        Print the detailed Harmony device configuration.
     show_current_activity
                         Print the current activity config.
     start_activity      Switch to a different activity.
     power_off           Stop the activity.
     sync                Sync the harmony.
+    listen              Output everything HUB sends out
     send_command        Send a simple command.
+    change_channel      Change the channel
 
 optional arguments:
   -h, --help            show this help message and exit
+  --harmony_ip HARMONY_IP
+                        IP Address of the Harmony device. (default: None)
+  --discover            Scan for Harmony devices. (default: False)
   --harmony_port HARMONY_PORT
                         Network port that the Harmony is listening on.
                         (default: 5222)
-  --loglevel {CRITICAL,ERROR,DEBUG,WARNING,INFO}
-                        Logging level to print to the console. (default: INFO)
+  --loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}
+                        Logging level for all components to print to the
+                        console. (default: INFO)
+  --show_responses      Print out responses coming from HUB. (default: False)
+  --no-show_responses   Do not print responses coming from HUB. (default:
+                        False)
+  --wait WAIT           How long to wait in seconds after completion, useful
+                        in combination with --show-responses. Use -1 to wait
+                        infinite, otherwise has to be a positive number.
+                        (default: 0)
 
-required arguments:
-  --harmony_ip HARMONY_IP
-                        IP Address of the Harmony device. (default: None)
-  OR
-  --discover
-                        Run a network scan to discover hubs
 ```
 
 TODO
 ----
 
-* Figure out how to detect when the session token expires so we can get a new
-  one.
-* Figure out a good way of sending commands based on sync state.
+* Redo discovery for asyncio. This will be done once XMPP is re-implemented by Logitech
+* More items can be done from the Harmony iOS app; determining what could be done within the library as well
 * Is it possible to update device configuration?

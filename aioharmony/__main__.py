@@ -212,7 +212,7 @@ async def sync(client, _):
 async def run(client):
     """Main method for the script."""
     parser = argparse.ArgumentParser(
-        description='Pyharmony - Harmony device control',
+        description='aioharmony - Harmony device control',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     required_flags = parser.add_mutually_exclusive_group(required=True)
