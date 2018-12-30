@@ -64,7 +64,7 @@ class HarmonyClient:
         self._hub_connection = HubConnector(
             ip_address=self._ip_address,
             callbacks=ConnectorCallbackType(
-                self._callbacks.connect,
+                None,
                 self._callbacks.disconnect
             ),
             response_queue=self._response_queue)
@@ -163,6 +163,21 @@ class HarmonyClient:
                                   self.name,
                                   self._hub_config.config_version)
 
+        if self._hub_connection.callbacks.connect is None and \
+            self._callbacks.connect is not None:
+            # First time call, add the callback handler now and run it.
+            _LOGGER.debug("%s, calling connect callback for first time",
+                          self.name)
+            call_callback(
+                callback_handler=self._callbacks.connect,
+                result=self._ip_address,
+                callback_uuid=self._ip_address,
+                callback_name='connected'
+            )
+            self._hub_connection.callbacks = ConnectorCallbackType(
+                self._callbacks.connect,
+                self._callbacks.disconnect
+            )
         return True
 
     async def close(self) -> None:
@@ -732,6 +747,9 @@ class HarmonyClient:
 
     def get_activity_id(self, activity_name) -> Optional[int]:
         """Find the activity ID for the provided activity name."""
+        if activity_name is None:
+            return None
+
         item = search_dict(match_value=activity_name.lower(),
                            key='name_lowercase',
                            search_list=self._hub_config.activities)
@@ -739,6 +757,9 @@ class HarmonyClient:
 
     def get_activity_name(self, activity_id) -> Optional[str]:
         """Find the activity name for the provided ID."""
+        if activity_id is None:
+            return None
+
         item = search_dict(match_value=int(activity_id),
                            key='id',
                            search_list=self._hub_config.activities)
@@ -746,6 +767,9 @@ class HarmonyClient:
 
     def get_device_id(self, device_name) -> Optional[int]:
         """Find the device ID for the provided device name."""
+        if device_name is None:
+            return None
+
         item = search_dict(match_value=device_name.lower(),
                            key='name_lowercase',
                            search_list=self._hub_config.devices)
@@ -753,6 +777,9 @@ class HarmonyClient:
 
     def get_device_name(self, device_id) -> Optional[str]:
         """Find the device name for the provided ID."""
+        if device_id is None:
+            return None
+
         item = search_dict(match_value=int(device_id),
                            key='id',
                            search_list=self._hub_config.devices)

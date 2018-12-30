@@ -24,8 +24,6 @@ DEFAULT_TIMEOUT = 30
 _LOGGER = logging.getLogger(__name__)
 
 
-# TODO: Need to see if I can further split this from protocol (web sockets,
-#  xmpp) being used
 # TODO: Add docstyle comments
 # TODO: Clean up code styling
 
