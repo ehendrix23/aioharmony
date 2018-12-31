@@ -49,7 +49,7 @@ class HarmonyClient:
                  ip_address: str,
                  callbacks: ClientCallbackType = None,
                  loop: asyncio.AbstractEventLoop = None):
-        _LOGGER.debug("%s: Initialize HUB on ", ip_address)
+        _LOGGER.debug("%s: Initialize HUB", ip_address)
         self._ip_address = ip_address
         self._callbacks = callbacks if callbacks is not None else \
             ClientCallbackType(None, None, None, None)

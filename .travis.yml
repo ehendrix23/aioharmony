@@ -1,4 +1,4 @@
-sudo: false
+language: python
 matrix:
   fast_finish: true
   include:
@@ -6,24 +6,5 @@ matrix:
       env: TOXENV=lint
     - python: "3.5.3"
       env: TOXENV=pylint
-    - python: "3.5.3"
-      env: TOXENV=typing
-    - python: "3.5.3"
-      env: TOXENV=cov
-      after_success: coveralls
-
-cache:
-  directories:
-    - $HOME/.cache/pip
-install: pip install -U tox coveralls
-language: python
-script: travis_wait 30 tox --develop
-services:
-  - docker
-deploy:
-  skip_cleanup: true
-  provider: script
-  script: script/travis_deploy
-  on:
-    branch: dev
-    condition: $TOXENV = lint
+install: pip install tox
+script: tox
