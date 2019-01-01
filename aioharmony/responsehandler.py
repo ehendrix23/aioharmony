@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
+
 This is the module contains the classes for the callback handler. It is used
 by :class:`~aioharmony.client.HarmonyClient` class to wait for responses from
 the HUB through callbacks.
@@ -37,7 +38,9 @@ CallbackEntryType = NamedTuple('CallbackEntryType',
 
 
 class ResponseHandler:
-    """Class to listen for json responses on the queue and then call
+    """
+
+    Class to listen for json responses on the queue and then call
     registered handlers based on search patterns.
 
     This class is used by :class:`~aioharmony.client.HarmonyClient`, there is

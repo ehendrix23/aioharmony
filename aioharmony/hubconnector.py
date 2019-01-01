@@ -198,7 +198,8 @@ class HubConnector:
 
         _LOGGER.debug("%s: Connection closed, reconnecting",
                       self._ip_address)
-        await self.connect()
+        while not await self.connect():
+            asyncio.sleep(10)
 
     async def send(self, command, params, msgid=None) -> Optional[str]:
         """Send a payload request to Harmony Hub and return json response."""

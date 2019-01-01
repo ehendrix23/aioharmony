@@ -82,6 +82,7 @@ class Handler:
     @property
     def handler_obj(self) -> CallbackType:
         """
+
         :param value: New handler_obj
         :type value: CallbackType
         :return: Returns handler_obj
@@ -97,6 +98,7 @@ class Handler:
     @property
     def handler_name(self) -> str:
         """
+
         :param value: New handler_name
         :type value: str
         :return: Returns handler_name
@@ -112,6 +114,7 @@ class Handler:
     @property
     def resp_json(self) -> dict:
         """
+
         :param value: New resp_type
         :type value: dict
         :return: Returns resp_type
@@ -127,6 +130,7 @@ class Handler:
     @property
     def once(self) -> bool:
         """
+
         :param value: New once
         :type value: bool
         :return: Returns once
@@ -142,6 +146,7 @@ class Handler:
     @property
     def expiration(self) -> timedelta:
         """
+
         :param value: New expiration
         :type value: timedelta
         :return: Returns expiration
