@@ -104,10 +104,11 @@ class HubConnector:
             if self._remote_id is None:
                 # We do not have the remoteId yet, get it first.
                 response = await self.retrieve_hub_info()
-                self._remote_id = response.get('remoteId')
-                domain = urlparse(response.get('discoveryServerUri'))
-                self._domain = domain.netloc if domain.netloc else \
-                    DEFAULT_DOMAIN
+                if response is not None:
+                    self._remote_id = response.get('remoteId')
+                    domain = urlparse(response.get('discoveryServerUri'))
+                    self._domain = domain.netloc if domain.netloc else \
+                        DEFAULT_DOMAIN
 
             if self._remote_id is None:
                 # No remote ID means no connect.
