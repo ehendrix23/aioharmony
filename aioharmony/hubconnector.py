@@ -320,7 +320,7 @@ class HubConnector:
         if not have_connection:
             await self._reconnect()
 
-    async def retrieve_hub_info(self) -> None:
+    async def retrieve_hub_info(self) -> Optional[dict]:
         """Retrieve the harmony Hub information."""
         _LOGGER.debug("%s: Retrieving Harmony Hub information.",
                       self._ip_address)
@@ -339,4 +339,7 @@ class HubConnector:
 
         response = await self.post(url, json_request, headers)
 
-        return response.get('data')
+        if response is not None:
+            return response.get('data')
+
+        return None
