@@ -63,7 +63,7 @@ CallbackType = Union[
 ClientConfigType = NamedTuple('ClientConfigType',
                               [('config', dict),
                                ('info', dict),
-                               ('config_version', int),
+                               ('config_version', Optional[int]),
                                ('activities', List[dict]),
                                ('devices', List[dict])
                                ])

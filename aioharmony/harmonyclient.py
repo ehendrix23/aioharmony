@@ -164,7 +164,7 @@ class HarmonyClient:
                                   self._hub_config.config_version)
 
         if self._hub_connection.callbacks.connect is None and \
-            self._callbacks.connect is not None:
+                self._callbacks.connect is not None:
             # First time call, add the callback handler now and run it.
             _LOGGER.debug("%s, calling connect callback for first time",
                           self.name)

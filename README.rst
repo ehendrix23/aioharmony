@@ -82,6 +82,21 @@ Usage
                             (default: 0)
 
 
+Release Notes
+-------------
+
+0.1.0. Initial Release
+
+0.1.2. Fixed:
+    - Enable callback connect only once initial connect and initialization is completed.
+    - Fix exception when activity/device name/id is None when trying to retrieve name/id.
+    - Fixed content type and name of README in setup.py
+0.1.3. Fixed:
+    - Retry connect on reconnect
+0.1.4. Fixed:
+    - Exception when retrieve_hub_info failed to retrieve information
+    - call_callback helper would never return True on success.
+    - Retry connect on reconnect (was not awaited upon)
 
 TODO
 ----

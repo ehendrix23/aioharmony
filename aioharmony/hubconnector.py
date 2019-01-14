@@ -32,6 +32,7 @@ ConnectorCallbackType = NamedTuple('ConnectorCallbackType',
                                     ('disconnect', Optional[CallbackType])
                                     ])
 
+
 # pylint: disable=too-many-instance-attributes
 class HubConnector:
     """An websocket client for connecting to the Logitech Harmony devices."""
@@ -104,10 +105,11 @@ class HubConnector:
             if self._remote_id is None:
                 # We do not have the remoteId yet, get it first.
                 response = await self.retrieve_hub_info()
-                self._remote_id = response.get('remoteId')
-                domain = urlparse(response.get('discoveryServerUri'))
-                self._domain = domain.netloc if domain.netloc else \
-                    DEFAULT_DOMAIN
+                if response is not None:
+                    self._remote_id = response.get('remoteId')
+                    domain = urlparse(response.get('discoveryServerUri'))
+                    self._domain = domain.netloc if domain.netloc else \
+                        DEFAULT_DOMAIN
 
             if self._remote_id is None:
                 # No remote ID means no connect.
@@ -199,7 +201,7 @@ class HubConnector:
         _LOGGER.debug("%s: Connection closed, reconnecting",
                       self._ip_address)
         while not await self.connect():
-            asyncio.sleep(10)
+            await asyncio.sleep(10)
 
     async def send(self, command, params, msgid=None) -> Optional[str]:
         """Send a payload request to Harmony Hub and return json response."""
@@ -320,7 +322,7 @@ class HubConnector:
         if not have_connection:
             await self._reconnect()
 
-    async def retrieve_hub_info(self) -> None:
+    async def retrieve_hub_info(self) -> Optional[dict]:
         """Retrieve the harmony Hub information."""
         _LOGGER.debug("%s: Retrieving Harmony Hub information.",
                       self._ip_address)
@@ -339,4 +341,7 @@ class HubConnector:
 
         response = await self.post(url, json_request, headers)
 
-        return response.get('data')
+        if response is not None:
+            return response.get('data')
+
+        return None
