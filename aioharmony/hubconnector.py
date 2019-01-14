@@ -32,6 +32,7 @@ ConnectorCallbackType = NamedTuple('ConnectorCallbackType',
                                     ('disconnect', Optional[CallbackType])
                                     ])
 
+
 # pylint: disable=too-many-instance-attributes
 class HubConnector:
     """An websocket client for connecting to the Logitech Harmony devices."""
@@ -200,7 +201,7 @@ class HubConnector:
         _LOGGER.debug("%s: Connection closed, reconnecting",
                       self._ip_address)
         while not await self.connect():
-            asyncio.sleep(10)
+            await asyncio.sleep(10)
 
     async def send(self, command, params, msgid=None) -> Optional[str]:
         """Send a payload request to Harmony Hub and return json response."""

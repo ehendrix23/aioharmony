@@ -17,6 +17,8 @@ from aioharmony.responsehandler import Handler
 # TODO: Add docstyle comments
 # TODO: Clean up code styling
 
+hub_client = None
+
 
 async def get_client(ip_address, show_responses) -> Optional[HarmonyAPI]:
     client = HarmonyAPI(ip_address)
@@ -209,8 +211,10 @@ async def sync(client, _):
         print("Sync failed")
 
 
-async def run(client):
+async def run():
     """Main method for the script."""
+    global hub_client
+
     parser = argparse.ArgumentParser(
         description='aioharmony - Harmony device control',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -342,16 +346,16 @@ async def run(client):
 
         # Connect to the HUB
         try:
-            client = await get_client(args.harmony_ip,
-                                      args.show_responses)
-            if client is None:
+            hub_client = await get_client(args.harmony_ip,
+                                          args.show_responses)
+            if hub_client is None:
                 return
         except aioharmony.exceptions.TimeOut:
             print("Action did not complete within a reasonable time.")
             raise
 
         if hasattr(args, 'func'):
-            coroutine = args.func(client, args)
+            coroutine = args.func(hub_client, args)
 
         # Execute provided request.
         try:
@@ -368,24 +372,23 @@ async def run(client):
             while True:
                 await asyncio.sleep(60)
 
-        if client:
-            await asyncio.wait_for(client.close(), timeout=10)
-            client = None
+        if hub_client:
+            await asyncio.wait_for(hub_client.close(), timeout=10)
+            hub_client = None
 
 
 def main() -> None:
     loop = asyncio.new_event_loop()
-    client = None
     try:
-        loop.run_until_complete(run(client))
+        loop.run_until_complete(run())
         while asyncio.all_tasks(loop):
             loop.run_until_complete(asyncio.gather(*asyncio.all_tasks(loop)))
         loop.close()
     except KeyboardInterrupt:
         print("Exit requested.")
-        if client is not None:
+        if hub_client is not None:
             loop.run_until_complete(
-                asyncio.wait_for(client.close(), timeout=10)
+                asyncio.wait_for(hub_client.close(), timeout=10)
             )
         print("Closed.")
 

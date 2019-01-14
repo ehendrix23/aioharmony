@@ -13,37 +13,41 @@ from aioharmony.handler import CallbackType
 
 _LOGGER = logging.getLogger(__name__)
 
-# TODO: Add this to Handler class instead?
+
 # pylint: disable=broad-except
 def call_callback(callback_handler: CallbackType,
                   result: object,
                   callback_uuid: str,
                   callback_name: str) -> bool:
     # If we were provided a callback handler then call it now.
-    try:
-        if callback_handler is not None:
-            callback_result = call_raw_callback(
-                callback=callback_handler,
-                result=result,
-                callback_uuid=callback_uuid,
-                callback_name=callback_name
-            )
-            if not callback_result:
-                _LOGGER.error("%s was not called due to mismatch in "
-                              "callback type.",
-                              callback_name
-                              )
-                return False
+    if callback_handler is None:
         return False
+
+    try:
+        callback_result = call_raw_callback(
+            callback=callback_handler,
+            result=result,
+            callback_uuid=callback_uuid,
+            callback_name=callback_name
+        )
     # Catching everything here.
     except Exception as exc:
         _LOGGER.exception("Exception in %s: %s",
                           callback_name,
                           exc)
         return False
+
+    if not callback_result:
+        _LOGGER.error("%s was not called due to mismatch in "
+                      "callback type.",
+                      callback_name
+                      )
+        return False
+
     return True
 
 
+# TODO: Add this to Handler class
 def call_raw_callback(callback: CallbackType,
                       result: object = None,
                       callback_uuid: str = None,
