@@ -616,6 +616,8 @@ class HarmonyClient:
                     continue
 
                 # Create the future to be set for the result.
+                # The HUB sends a message back if there is an issue with
+                # the command, otherwise it won't sent anything back.
                 command_future_list.append(self._loop.create_future())
 
                 expiration = 0.5
@@ -636,49 +638,44 @@ class HarmonyClient:
                     msgid_dict.update({msgid: command})
 
         # Go through the result list to determine there were any issues with
-        # any of the commands set. Only if there is an issue would a response
+        # any of the commands sent. Only if there is an issue would a response
         # have been received.
+        done, _ = await asyncio.wait(command_future_list, timeout=1)
+
         error_response_list = []
-        try:
-            done, _pending = await asyncio.wait(command_future_list,
-                                                timeout=1)
-            for result_returned in done:
-                msgid = result_returned.get('id')
-                if msgid is None:
-                    _LOGGER.warning("%s: Received response for send commands "
-                                    "without a message id",
-                                    self.name)
-                    continue
+        for result_returned in done:
+            result = result_returned.result()
+            msgid = result.get('id')
+            if msgid is None:
+                _LOGGER.warning("%s: Received response for send commands "
+                                "without a message id",
+                                self.name)
+                continue
 
-                command_sent = msgid_dict.get(msgid)
-                if command_sent is None:
-                    _LOGGER.warning("%s: Received response for send command "
-                                    "with unknown message id %s",
-                                    self.name,
-                                    msgid)
-                    continue
+            command_sent = msgid_dict.get(msgid)
+            if command_sent is None:
+                _LOGGER.warning("%s: Received response for send command "
+                                "with unknown message id %s",
+                                self.name,
+                                msgid)
+                continue
 
-                if isinstance(command_sent, (float, int)):
-                    continue
+            if isinstance(command_sent, (float, int)):
+                continue
 
-                _LOGGER.debug("%s: Received code %s for command %s to device "
-                              "%s: %s",
-                              self.name,
-                              result_returned.get('code'),
-                              command_sent.command,
-                              command_sent.device,
-                              result_returned.get('msg')
-                              )
-                error_response_list.append(SendCommandResponse(
-                    command=command_sent,
-                    code=result_returned.get('code'),
-                    msg=result_returned.get('msg')
-                ))
-        except asyncio.TimeoutError as exc:
-            _LOGGER.debug("%s: Timed out waiting for send command errors: %s",
+            _LOGGER.debug("%s: Received code %s for command %s to device "
+                          "%s: %s",
                           self.name,
-                          exc)
-            raise aioexc.TimeOut
+                          result.get('code'),
+                          command_sent.command,
+                          command_sent.device,
+                          result.get('msg')
+                          )
+            error_response_list.append(SendCommandResponse(
+                command=command_sent,
+                code=result.get('code'),
+                msg=result.get('msg')
+            ))
 
         _LOGGER.debug("%s: Sending commands to HUB has been completed",
                       self.name)
