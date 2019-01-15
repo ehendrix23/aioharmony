@@ -145,7 +145,7 @@ async def send_command(client, args):
         device_id = client.get_device_id(str(args.device_id).strip())
 
     if device_id is None:
-        print("Device %s is invalid.".format(args.device_id))
+        print("Device {} is invalid.".format(args.device_id))
         return
 
     snd_cmmnd = SendCommandDevice(
@@ -161,7 +161,7 @@ async def send_command(client, args):
 
     result_list = await client.send_commands(snd_cmmnd_list)
 
-    if not result_list:
+    if result_list:
         for result in result_list:
             print("Sending of command {} to device {} failed with code {}: "
                   "{}".format(

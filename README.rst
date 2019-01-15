@@ -97,6 +97,9 @@ Release Notes
     - Exception when retrieve_hub_info failed to retrieve information
     - call_callback helper would never return True on success.
     - Retry connect on reconnect (was not awaited upon)
+0.1.5. Fixed:
+    - Exception when an invalid command was sent to HUB (or sending command failed on HUB).
+    - Messages for failed commands was not printed in main.
 
 TODO
 ----
