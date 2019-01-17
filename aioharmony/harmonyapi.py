@@ -38,7 +38,7 @@ class HarmonyAPI:
     def __init__(self,
                  ip_address: str,
                  callbacks: ClientCallbackType = None,
-                 loop: asyncio.AbstractEventLoop = None):
+                 loop: asyncio.AbstractEventLoop = None) -> None:
         _LOGGER.debug("%s: Initialize", ip_address)
         loop = loop if loop else asyncio.get_event_loop()
 

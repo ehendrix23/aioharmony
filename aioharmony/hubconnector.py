@@ -41,7 +41,7 @@ class HubConnector:
                  ip_address: str,
                  response_queue: asyncio.Queue,
                  callbacks: ConnectorCallbackType = None,
-                 auto_reconnect=True):
+                 auto_reconnect=True) -> None:
         self._ip_address = ip_address
         self._response_queue = response_queue
         self._callbacks = callbacks if callbacks is not None else \
@@ -201,7 +201,7 @@ class HubConnector:
         _LOGGER.debug("%s: Connection closed, reconnecting",
                       self._ip_address)
         while not await self.connect():
-            await asyncio.sleep(10)
+            await asyncio.sleep(5)
 
     async def send(self, command, params, msgid=None) -> Optional[str]:
         """Send a payload request to Harmony Hub and return json response."""
