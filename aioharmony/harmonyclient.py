@@ -48,7 +48,7 @@ class HarmonyClient:
     def __init__(self,
                  ip_address: str,
                  callbacks: ClientCallbackType = None,
-                 loop: asyncio.AbstractEventLoop = None):
+                 loop: asyncio.AbstractEventLoop = None) -> None:
         _LOGGER.debug("%s: Initialize HUB", ip_address)
         self._ip_address = ip_address
         self._callbacks = callbacks if callbacks is not None else \
@@ -671,11 +671,14 @@ class HarmonyClient:
                           command_sent.device,
                           result.get('msg')
                           )
-            error_response_list.append(SendCommandResponse(
-                command=command_sent,
-                code=result.get('code'),
-                msg=result.get('msg')
-            ))
+
+            # HUB might send back OK (200) code, ignore those.
+            if str(result.get('code')) <> '200':
+                error_response_list.append(SendCommandResponse(
+                    command=command_sent,
+                    code=result.get('code'),
+                    msg=result.get('msg')
+                ))
 
         _LOGGER.debug("%s: Sending commands to HUB has been completed",
                       self.name)
