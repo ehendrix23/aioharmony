@@ -673,7 +673,7 @@ class HarmonyClient:
                           )
 
             # HUB might send back OK (200) code, ignore those.
-            if str(result.get('code')) <> '200':
+            if str(result.get('code')) != '200':
                 error_response_list.append(SendCommandResponse(
                     command=command_sent,
                     code=result.get('code'),
