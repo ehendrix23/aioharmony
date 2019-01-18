@@ -62,10 +62,12 @@ class HubConnector:
 
     @property
     def callbacks(self) -> ConnectorCallbackType:
+        """Return callbacks."""
         return self._callbacks
 
     @callbacks.setter
     def callbacks(self, value: ConnectorCallbackType) -> None:
+        """Set callbacks."""
         self._callbacks = value
 
     async def close(self):
@@ -88,7 +90,20 @@ class HubConnector:
         self._aiohttp_session = aiohttp.ClientSession(timeout=session_timeout)
         return self._aiohttp_session
 
-    async def connect(self) -> bool:
+    async def _get_remote_id(self) -> Optional[str]:
+        """Retrieve remote id from the HUB."""
+
+        if self._remote_id is None:
+            # We do not have the remoteId yet, get it first.
+            response = await self.retrieve_hub_info()
+            if response is not None:
+                self._remote_id = response.get('remoteId')
+                domain = urlparse(response.get('discoveryServerUri'))
+                self._domain = domain.netloc if domain.netloc else \
+                    DEFAULT_DOMAIN
+        return self._remote_id
+
+    async def connect(self, is_reconnect: bool = False) -> bool:
         """Connect to Hub Web Socket"""
         # Acquire the lock.
         if self._connect_disconnect_lock.locked():
@@ -96,25 +111,16 @@ class HubConnector:
 
         async with self._connect_disconnect_lock:
             # Return connected if we are already connected.
-            if self._websocket:
-                if not self._websocket.closed:
-                    return True
+            if self._websocket and not self._websocket.closed:
+                return True
 
             _LOGGER.debug("%s: Starting connect.", self._ip_address)
 
-            if self._remote_id is None:
-                # We do not have the remoteId yet, get it first.
-                response = await self.retrieve_hub_info()
-                if response is not None:
-                    self._remote_id = response.get('remoteId')
-                    domain = urlparse(response.get('discoveryServerUri'))
-                    self._domain = domain.netloc if domain.netloc else \
-                        DEFAULT_DOMAIN
-
-            if self._remote_id is None:
+            if await self._get_remote_id() is None:
                 # No remote ID means no connect.
-                _LOGGER.error("%s: Unable to retrieve HUB id",
-                              self._ip_address)
+                if not is_reconnect:
+                    _LOGGER.error("%s: Unable to retrieve HUB id",
+                                  self._ip_address)
                 return False
 
             _LOGGER.debug("%s: Connecting for hub %s", self._ip_address,
@@ -122,25 +128,33 @@ class HubConnector:
             try:
                 self._websocket = await self._session.ws_connect(
                     'ws://{}:{}/?domain={}&hubId={}'.format(
-                        self._ip_address, DEFAULT_HUB_PORT,
-                        self._domain, self._remote_id
-                    ), heartbeat=10
+                        self._ip_address,
+                        DEFAULT_HUB_PORT,
+                        self._domain,
+                        self._remote_id
+                    ),
+                    heartbeat=10
                 )
-            except aiohttp.ServerTimeoutError:
-                _LOGGER.error("%s: Connection timed for hub %s",
-                              self._ip_address, self._remote_id)
-                self._websocket = None
-                return False
-            except aiohttp.WSServerHandshakeError as exc:
-                _LOGGER.error("%s: Invalid status code %s received trying to "
-                              "connect for hub %s: %s", self._ip_address,
-                              exc.status, self._remote_id, exc)
-                self._websocket = None
-                return False
-            except aiohttp.ClientError as exc:
-                _LOGGER.error("%s: Exception trying to establish web socket "
-                              "connection for hub %s: %s", self._ip_address,
-                              self._remote_id, exc)
+            except (aiohttp.ServerTimeoutError, aiohttp.ClientError,
+                    aiohttp.WSServerHandshakeError) as exc:
+                if not is_reconnect:
+                    if isinstance(exc, aiohttp.ServerTimeoutError):
+                        _LOGGER.error("%s: Connection timed out for hub %s",
+                                      self._ip_address, self._remote_id)
+                    elif isinstance(exc, aiohttp.ClientError):
+                        _LOGGER.error("%s: Exception trying to establish web "
+                                      "socket connection for hub %s: %s",
+                                      self._ip_address,
+                                      self._remote_id,
+                                      exc)
+                    else:
+                        _LOGGER.error(
+                            "%s: Invalid status code %s received trying"
+                            " to connect for hub %s: %s",
+                            self._ip_address,
+                            exc.status,
+                            self._remote_id,
+                            exc)
                 self._websocket = None
                 return False
 
@@ -169,7 +183,7 @@ class HubConnector:
             self._connected = False
 
             if self._websocket:
-                with suppress(asyncio.TimeoutError),\
+                with suppress(asyncio.TimeoutError), \
                      timeout(DEFAULT_TIMEOUT):
                     await self._websocket.close()
 
@@ -200,8 +214,10 @@ class HubConnector:
 
         _LOGGER.debug("%s: Connection closed, reconnecting",
                       self._ip_address)
-        while not await self.connect():
+        is_reconnect = False
+        while not await self.connect(is_reconnect=is_reconnect):
             await asyncio.sleep(10)
+            is_reconnect = True
 
     async def send(self, command, params, msgid=None) -> Optional[str]:
         """Send a payload request to Harmony Hub and return json response."""
@@ -213,11 +229,11 @@ class HubConnector:
             msgid = str(uuid4())
 
         payload = {
-            "hubId":   self._remote_id,
+            "hubId": self._remote_id,
             "timeout": DEFAULT_TIMEOUT,
-            "hbus":    {
-                "cmd":    command,
-                "id":     msgid,
+            "hbus": {
+                "cmd": command,
+                "id": msgid,
                 "params": params
             }
         }
@@ -328,14 +344,14 @@ class HubConnector:
                       self._ip_address)
         url = 'http://{}:{}/'.format(self._ip_address, DEFAULT_HUB_PORT)
         headers = {
-            'Origin':         'http://localhost.nebula.myharmony.com',
-            'Content-Type':   'application/json',
-            'Accept':         'application/json',
+            'Origin': 'http://localhost.nebula.myharmony.com',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
             'Accept-Charset': 'utf-8',
         }
         json_request = {
-            "id ":    1,
-            "cmd":    "connect.discoveryinfo?get",
+            "id ": 1,
+            "cmd": "connect.discoveryinfo?get",
             "params": {}
         }
 
