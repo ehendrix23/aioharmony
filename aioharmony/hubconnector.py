@@ -14,8 +14,8 @@ from uuid import uuid4
 import aiohttp
 from async_timeout import timeout
 
-from aioharmony.helpers import call_callback
 from aioharmony.handler import CallbackType
+from aioharmony.helpers import call_callback
 
 DEFAULT_DOMAIN = 'svcs.myharmony.com'
 DEFAULT_HUB_PORT = '8088'
@@ -201,7 +201,7 @@ class HubConnector:
         _LOGGER.debug("%s: Connection closed, reconnecting",
                       self._ip_address)
         while not await self.connect():
-            await asyncio.sleep(5)
+            await asyncio.sleep(10)
 
     async def send(self, command, params, msgid=None) -> Optional[str]:
         """Send a payload request to Harmony Hub and return json response."""
