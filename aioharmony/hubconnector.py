@@ -116,11 +116,16 @@ class HubConnector:
 
             _LOGGER.debug("%s: Starting connect.", self._ip_address)
 
+            if is_reconnect:
+                log_level = 10
+            else:
+                log_level = 40
+
             if await self._get_remote_id() is None:
                 # No remote ID means no connect.
-                if not is_reconnect:
-                    _LOGGER.error("%s: Unable to retrieve HUB id",
-                                  self._ip_address)
+                _LOGGER.log(log_level,
+                            "%s: Unable to retrieve HUB id",
+                            self._ip_address)
                 return False
 
             _LOGGER.debug("%s: Connecting for hub %s", self._ip_address,
@@ -139,22 +144,25 @@ class HubConnector:
                     aiohttp.WSServerHandshakeError) as exc:
                 if not is_reconnect:
                     if isinstance(exc, aiohttp.ServerTimeoutError):
-                        _LOGGER.error("%s: Connection timed out for hub %s",
-                                      self._ip_address, self._remote_id)
+                        _LOGGER.log(log_level,
+                                    "%s: Connection timed out for hub %s",
+                                    self._ip_address,
+                                    self._remote_id)
                     elif isinstance(exc, aiohttp.ClientError):
-                        _LOGGER.error("%s: Exception trying to establish web "
-                                      "socket connection for hub %s: %s",
-                                      self._ip_address,
-                                      self._remote_id,
-                                      exc)
+                        _LOGGER.log(log_level,
+                                    "%s: Exception trying to establish web "
+                                    "socket connection for hub %s: %s",
+                                    self._ip_address,
+                                    self._remote_id,
+                                    exc)
                     else:
-                        _LOGGER.error(
-                            "%s: Invalid status code %s received trying"
-                            " to connect for hub %s: %s",
-                            self._ip_address,
-                            exc.status,
-                            self._remote_id,
-                            exc)
+                        _LOGGER.log(log_level,
+                                    "%s: Invalid status code %s received "
+                                    "trying to connect for hub %s: %s",
+                                    self._ip_address,
+                                    exc.status,
+                                    self._remote_id,
+                                    exc)
                 self._websocket = None
                 return False
 
