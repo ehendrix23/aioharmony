@@ -90,18 +90,19 @@ class HarmonyAPI:
         config = self.config
         activity_dict = {}
 
-        for activity in config.get('activity'):
+        for activity in config.get('activity', []):
             activity_dict.update({activity['id']: activity['label']})
 
         result.update(Activities=activity_dict)
 
         devices_dict = {}
-        for device in config.get('device'):
+        for device in config.get('device', []):
             command_list = []
-            for control_group in device['controlGroup']:
-                for function in control_group['function']:
-                    action = json.loads(function['action'])
-                    command_list.append(action.get('command'))
+            for control_group in device.get('controlGroup', []):
+                for function in control_group.get('function', []):
+                    action = json.loads(function.get('action')
+                    if action is not None:
+                        command_list.append(action.get('command'))
 
             device_dict = {
                 'id':       device.get('id'),
