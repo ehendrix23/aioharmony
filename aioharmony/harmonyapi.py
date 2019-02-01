@@ -75,8 +75,8 @@ class HarmonyAPI:
     @property
     def current_activity(self) -> tuple:
         return self._harmony_client.current_activity_id, \
-               self._harmony_client.get_activity_name(
-                   self._harmony_client.current_activity_id)
+            self._harmony_client.get_activity_name(
+                self._harmony_client.current_activity_id)
 
     @property
     def config(self) -> dict:
@@ -100,12 +100,12 @@ class HarmonyAPI:
             command_list = []
             for control_group in device.get('controlGroup', []):
                 for function in control_group.get('function', []):
-                    action = json.loads(function.get('action')
+                    action = json.loads(function.get('action'))
                     if action is not None:
                         command_list.append(action.get('command'))
 
             device_dict = {
-                'id':       device.get('id'),
+                'id': device.get('id'),
                 'commands': command_list
             }
 
@@ -238,7 +238,7 @@ class HarmonyAPI:
                       channel)
         params = {
             "timestamp": 0,
-            'channel':   str(channel)
+            'channel': str(channel)
         }
 
         # Send the command to the HUB

@@ -137,11 +137,11 @@ class HarmonyClient:
         # to receive the response and set our current config version
         # accordingly.
 
-        results = await asyncio.gather(self.send_to_hub(command=
-                                                        'get_current_state'),
-                                       self.refresh_info_from_hub(),
-                                       return_exceptions=True
-                                       )
+        results = await asyncio.gather(
+            self.send_to_hub(command='get_current_state'),
+            self.refresh_info_from_hub(),
+            return_exceptions=True
+        )
         for idx, result in enumerate(results):
             if isinstance(result, Exception):
                 if not isinstance(
@@ -251,9 +251,9 @@ class HarmonyClient:
                 with timeout(DEFAULT_TIMEOUT):
                     await self._get_current_activity()
             except asyncio.TimeoutError:
-                _LOGGER.error("%s: Timeout trying to retrieve %s.",
-                              self.name,
-                              result_name)
+                _LOGGER.error("%s: Timeout trying to retrieve current "
+                              "activity.",
+                              self.name)
                 return
 
         # If we were provided a callback handler then call it now.
@@ -293,17 +293,17 @@ class HarmonyClient:
         self._hub_config = self._hub_config._replace(
             activities=list(
                 {
-                    'name':           a['label'],
+                    'name': a['label'],
                     'name_lowercase': a['label'].lower(),
-                    'id':             int(a['id'])
+                    'id': int(a['id'])
                 } for a in self._hub_config.config.get('activity')))
 
         self._hub_config = self._hub_config._replace(
             devices=list(
                 {
-                    'name':           a['label'],
+                    'name': a['label'],
                     'name_lowercase': a['label'].lower(),
-                    'id':             int(a['id'])
+                    'id': int(a['id'])
                 } for a in self._hub_config.config.get('device')))
 
         return self._hub_config.config
@@ -331,7 +331,7 @@ class HarmonyClient:
 
         if params is None:
             params = {
-                'verb':   'get',
+                'verb': 'get',
                 'format': 'json'
             }
 
@@ -495,9 +495,9 @@ class HarmonyClient:
                       self.get_activity_name(activity_id),
                       activity_id)
         params = {
-            "async":      "true",
-            "timestamp":  0,
-            "args":       {
+            "async": "true",
+            "timestamp": 0,
+            "args": {
                 "rule": "start"
             },
             "activityId": str(activity_id)
@@ -546,7 +546,7 @@ class HarmonyClient:
             if data is not None:
                 progress = {
                     'completed': data.get('done'),
-                    'total':     data.get('total')
+                    'total': data.get('total')
                 }
                 _LOGGER.info("%s: %s/%s of start activity %s completed.",
                              self.name,
@@ -714,13 +714,13 @@ class HarmonyClient:
                       command.device,
                       command.delay)
         params = {
-            "status":    "press",
+            "status": "press",
             "timestamp": '0',
-            "verb":      "render",
-            "action":    '{{"command": "{}",'
-                         '"type": "IRCommand",'
-                         '"deviceId": "{}"}}'.format(command.command,
-                                                     command.device)
+            "verb": "render",
+            "action": '{{"command": "{}",'
+                      '"type": "IRCommand",'
+                      '"deviceId": "{}"}}'.format(command.command,
+                                                  command.device)
         }
         msgid = str(uuid4())
 
