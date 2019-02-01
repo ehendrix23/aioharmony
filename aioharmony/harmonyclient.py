@@ -217,11 +217,11 @@ class HarmonyClient:
 
         async with self._sync_lck:
             try:
+                # Retrieve configuration and HUB version config.
                 with timeout(DEFAULT_TIMEOUT):
                     results = await asyncio.gather(
                         self._get_config(),
                         self._retrieve_hub_info(),
-                        self._get_current_activity(),
                         return_exceptions=True
                     )
             except asyncio.TimeoutError:
@@ -241,9 +241,20 @@ class HarmonyClient:
                     _LOGGER.error("%s: Timeout trying to retrieve %s.",
                                   self.name,
                                   result_name)
+                    return
                 elif isinstance(result, Exception):
                     # Other exception, raise it.
                     raise result
+
+            try:
+                # Retrieve current activity, done only once config received.
+                with timeout(DEFAULT_TIMEOUT):
+                    await self._get_current_activity()
+            except asyncio.TimeoutError:
+                _LOGGER.error("%s: Timeout trying to retrieve %s.",
+                              self.name,
+                              result_name)
+                return
 
         # If we were provided a callback handler then call it now.
         if self._callbacks.config_updated:
