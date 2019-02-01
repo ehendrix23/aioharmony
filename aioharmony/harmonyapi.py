@@ -38,7 +38,7 @@ class HarmonyAPI:
     def __init__(self,
                  ip_address: str,
                  callbacks: ClientCallbackType = None,
-                 loop: asyncio.AbstractEventLoop = None):
+                 loop: asyncio.AbstractEventLoop = None) -> None:
         _LOGGER.debug("%s: Initialize", ip_address)
         loop = loop if loop else asyncio.get_event_loop()
 
@@ -75,8 +75,8 @@ class HarmonyAPI:
     @property
     def current_activity(self) -> tuple:
         return self._harmony_client.current_activity_id, \
-               self._harmony_client.get_activity_name(
-                   self._harmony_client.current_activity_id)
+            self._harmony_client.get_activity_name(
+                self._harmony_client.current_activity_id)
 
     @property
     def config(self) -> dict:
@@ -90,21 +90,22 @@ class HarmonyAPI:
         config = self.config
         activity_dict = {}
 
-        for activity in config.get('activity'):
+        for activity in config.get('activity', []):
             activity_dict.update({activity['id']: activity['label']})
 
         result.update(Activities=activity_dict)
 
         devices_dict = {}
-        for device in config.get('device'):
+        for device in config.get('device', []):
             command_list = []
-            for control_group in device['controlGroup']:
-                for function in control_group['function']:
-                    action = json.loads(function['action'])
-                    command_list.append(action.get('command'))
+            for control_group in device.get('controlGroup', []):
+                for function in control_group.get('function', []):
+                    action = json.loads(function.get('action'))
+                    if action is not None:
+                        command_list.append(action.get('command'))
 
             device_dict = {
-                'id':       device.get('id'),
+                'id': device.get('id'),
                 'commands': command_list
             }
 
@@ -237,7 +238,7 @@ class HarmonyAPI:
                       channel)
         params = {
             "timestamp": 0,
-            'channel':   str(channel)
+            'channel': str(channel)
         }
 
         # Send the command to the HUB

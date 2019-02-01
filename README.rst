@@ -99,7 +99,13 @@ Release Notes
     - Retry connect on reconnect (was not awaited upon)
 0.1.5. Fixed:
     - Exception when an invalid command was sent to HUB (or sending command failed on HUB).
-    - Messages for failed commands was not printed in main.
+    - Messages for failed commands were not printed in main.
+0.1.6. Fixed:
+    - Ignore response code 200 when for sending commands
+    - Upon reconnect, errors will be logged on 1st try only, any subsequent retry until connection is successful will only provide DEBUG log entries.
+0.1.7. Fixed:
+    - Fix traceback if no configuration retrieved or items missing from configuration (i.e. no activities)
+    - Retrieve current activity only after retrieving configuration
 
 TODO
 ----
