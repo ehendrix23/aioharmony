@@ -316,8 +316,9 @@ class HarmonyClient:
         except asyncio.TimeoutError:
             raise aioexc.TimeOut
 
-        self._hub_config = self._hub_config._replace(
-            info=response)
+        if response is not None:
+            self._hub_config = self._hub_config._replace(
+                info=response)
         return self._hub_config.info
 
     async def send_to_hub(self,
