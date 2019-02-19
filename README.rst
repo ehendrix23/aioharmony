@@ -104,8 +104,11 @@ Release Notes
     - Ignore response code 200 when for sending commands
     - Upon reconnect, errors will be logged on 1st try only, any subsequent retry until connection is successful will only provide DEBUG log entries.
 0.1.7. Fixed:
+    NOTE: This version will ONLY work with 4.15.250 or potentially higher. It will not work with lower versions!
     - Fix traceback if no configuration retrieved or items missing from configuration (i.e. no activities)
     - Retrieve current activity only after retrieving configuration
+    - Fix traceback if HUB info is not received.
+    - Fix for new HUB version 4.15.250.
 
 TODO
 ----
