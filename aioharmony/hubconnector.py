@@ -97,8 +97,8 @@ class HubConnector:
             # We do not have the remoteId yet, get it first.
             response = await self.retrieve_hub_info()
             if response is not None:
-                self._remote_id = response.get('remoteId')
-                domain = urlparse(response.get('discoveryServerUri'))
+                self._remote_id = response.get('activeRemoteId')
+                domain = urlparse(response.get('discoveryServer'))
                 self._domain = domain.netloc if domain.netloc else \
                     DEFAULT_DOMAIN
         return self._remote_id
@@ -264,7 +264,7 @@ class HubConnector:
         try:
             async with self._session.post(
                     url, json=json_request, headers=headers) as response:
-                json_response = await response.json()
+                json_response = await response.json(content_type=None)
                 _LOGGER.debug("%s: Post response: %s",
                               self._ip_address,
                               json_response)
@@ -352,14 +352,14 @@ class HubConnector:
                       self._ip_address)
         url = 'http://{}:{}/'.format(self._ip_address, DEFAULT_HUB_PORT)
         headers = {
-            'Origin': 'http://localhost.nebula.myharmony.com',
+            'Origin': 'http://sl.dhg.myharmony.com',
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Accept-Charset': 'utf-8',
         }
         json_request = {
             "id ": 1,
-            "cmd": "connect.discoveryinfo?get",
+            "cmd": "setup.account?getProvisionInfo",
             "params": {}
         }
 
