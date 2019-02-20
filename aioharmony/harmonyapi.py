@@ -16,7 +16,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import List, Optional, Union
 from aioharmony.const import (
-    ClientConfigType, PROTOCOL, SendCommandArg, SendCommandDevice, SendCommandResponse
+    ClientConfigType, SendCommandArg, SendCommandDevice, SendCommandResponse
 )
 from aioharmony.harmonyclient import ClientCallbackType, HarmonyClient
 from aioharmony.handler import Handler
@@ -37,14 +37,13 @@ class HarmonyAPI:
     # pylint: disable=too-many-arguments
     def __init__(self,
                  ip_address: str,
-                 protocol: PROTOCOL = None,
                  callbacks: ClientCallbackType = None,
                  loop: asyncio.AbstractEventLoop = None) -> None:
         _LOGGER.debug("%s: Initialize", ip_address)
         loop = loop if loop else asyncio.get_event_loop()
+
         self._harmony_client = HarmonyClient(
             ip_address=ip_address,
-            protocol=protocol,
             callbacks=callbacks,
             loop=loop
         )
@@ -52,10 +51,6 @@ class HarmonyAPI:
     @property
     def ip_address(self) -> str:
         return self._harmony_client.ip_address
-
-    @property
-    def protocol(self) -> str:
-        return self._harmony_client.protocol
 
     @property
     def hub_config(self) -> ClientConfigType:
@@ -75,11 +70,7 @@ class HarmonyAPI:
 
     @property
     def fw_version(self) -> Optional[str]:
-        return self.hub_config.hub_state.get('hubSwVersion')
-
-    @property
-    def hub_id(self) -> Optional[str]:
-        return self.hub_config.info.get('activeRemoteId')
+        return self.hub_config.info.get('hubSwVersion')
 
     @property
     def current_activity(self) -> tuple:

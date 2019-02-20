@@ -20,16 +20,23 @@ from async_timeout import timeout
 import aioharmony.exceptions as aioexc
 import aioharmony.handler as handlers
 from aioharmony.const import (
-    ClientCallbackType, ClientConfigType, ConnectorCallbackType,
-    DEFAULT_XMPP_HUB_PORT, HUB_COMMANDS, PROTOCOL, SendCommand, SendCommandDevice,
-    SendCommandResponse, WEBSOCKETS, XMPP
+    CallbackType, ClientConfigType, HUB_COMMANDS, SendCommand,
+    SendCommandDevice, SendCommandResponse
 )
 from aioharmony.helpers import call_callback, search_dict
+from aioharmony.hubconnector import ConnectorCallbackType, HubConnector
 from aioharmony.responsehandler import Handler, ResponseHandler
 
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT = 60
+
+ClientCallbackType = NamedTuple('ClientCallbackType',
+                                [('connect', Optional[CallbackType]),
+                                 ('disconnect', Optional[CallbackType]),
+                                 ('new_activity', Optional[CallbackType]),
+                                 ('config_updated', Optional[CallbackType])
+                                 ])
 
 # TODO: Add docstyle comments
 # TODO: Clean up code styling
@@ -41,28 +48,30 @@ class HarmonyClient:
     # pylint: disable=too-many-arguments
     def __init__(self,
                  ip_address: str,
-                 protocol: PROTOCOL = None,
                  callbacks: ClientCallbackType = None,
                  loop: asyncio.AbstractEventLoop = None) -> None:
         _LOGGER.debug("%s: Initialize HUB", ip_address)
         self._ip_address = ip_address
-        self._protocol = protocol
         self._callbacks = callbacks if callbacks is not None else \
-            ClientCallbackType(None, None, None, None, None)
+            ClientCallbackType(None, None, None, None)
         self._loop = loop if loop else asyncio.get_event_loop()
 
-        self._hub_config = ClientConfigType({}, {}, {}, {}, None, [], [])
+        self._hub_config = ClientConfigType({}, {}, None, [], [])
         self._current_activity_id = None
-        self._hub_connection = None
 
         # Get the queue on which JSON responses will be put
         self._response_queue = asyncio.Queue()
-
+        # Get the Hub Connection
+        self._hub_connection = HubConnector(
+            ip_address=self._ip_address,
+            callbacks=ConnectorCallbackType(
+                None,
+                self._callbacks.disconnect
+            ),
+            response_queue=self._response_queue)
         # Get the Response Handler
         self._callback_handler = ResponseHandler(
-            message_queue=self._response_queue,
-            name=self.name
-        )
+            message_queue=self._response_queue)
 
         # Create the lock for sending commands or starting an activity
         self._snd_cmd_act_lck = asyncio.Lock()
@@ -70,21 +79,9 @@ class HarmonyClient:
         # Create the lock for getting HUB information.
         self._sync_lck = asyncio.Lock()
 
-        # Create the activity start handler object when start activity is finished
+        # Create the activity start handler object
         handler = copy.copy(handlers.HANDLER_START_ACTIVITY_FINISHED)
         handler.handler_obj = self._update_activity_callback
-        self._callback_handler.register_handler(
-            handler=handler)
-
-        # Create the activity start handler object when start activity is finished
-        handler = copy.copy(handlers.HANDLER_START_ACTIVITY_NOTIFY_STARTED)
-        handler.handler_obj = self._update_start_activity_callback
-        self._callback_handler.register_handler(
-            handler=handler)
-
-        # Create the activity start handler object when start activity is finished
-        handler = copy.copy(handlers.HANDLER_STOP_ACTIVITY_NOTIFY_STARTED)
-        handler.handler_obj = self._update_start_activity_callback
         self._callback_handler.register_handler(
             handler=handler)
 
@@ -99,12 +96,8 @@ class HarmonyClient:
         return self._ip_address
 
     @property
-    def protocol(self) -> str:
-        return self._protocol
-
-    @property
     def name(self) -> Optional[str]:
-        name = self._hub_config.discover_info.get('friendlyName')
+        name = self._hub_config.info.get('friendlyName')
         return name if name is not None else self._ip_address
 
     @property
@@ -127,49 +120,6 @@ class HarmonyClient:
     def current_activity_id(self):
         return self._current_activity_id
 
-    async def _websocket_or_xmpp(self) -> bool:
-        """ Determine if XMPP is enabled, if not fall-back to web sockets.
-        """
-        if not self._protocol == WEBSOCKETS :
-            try:
-                _, _ = await asyncio.open_connection(host=self._ip_address,
-                                                     port=DEFAULT_XMPP_HUB_PORT,
-                                                     loop=self._loop
-                                                     )
-            except ConnectionRefusedError:
-                if self._protocol == XMPP:
-                    _LOGGER.warning("%s: XMPP is not enabled on this HUB, will be defaulting back to WEBSOCKETS.",
-                                    self.name)
-                else:
-                    _LOGGER.debug("%s: XMPP is not enabled, using web sockets.",
-                                    self.name)
-                self._protocol = WEBSOCKETS
-            except OSError as exc:
-                _LOGGER.error("%s: Unable to determine if XMPP is enabled: %s",
-                              self.name,
-                              exc)
-                if self._protocol is None:
-                    return False
-            else:
-                _LOGGER.debug("%s: XMPP is enabled", self.name)
-                self._protocol = XMPP
-
-        if self._protocol == WEBSOCKETS:
-            _LOGGER.debug("%s: Using WEBSOCKETS", self.name)
-            from aioharmony.hubconnector_websocket import HubConnector
-        else:
-            _LOGGER.debug("%s: Using XMPP", self.name)
-            from aioharmony.hubconnector_xmpp import HubConnector
-
-        self._hub_connection = HubConnector(
-            ip_address=self._ip_address,
-            callbacks=ConnectorCallbackType(
-                None,
-                self._callbacks.disconnect
-            ),
-            response_queue=self._response_queue)
-        return True
-
     async def connect(self) -> bool:
         """
 
@@ -177,11 +127,6 @@ class HarmonyClient:
         :rtype: bool
         :raises: :class:`~aioharmony.exceptions.TimeOut`
         """
-
-        if self._hub_connection is None:
-            if not await self._websocket_or_xmpp():
-                return False
-
         try:
             with timeout(DEFAULT_TIMEOUT):
                 if not await self._hub_connection.hub_connect():
@@ -216,14 +161,10 @@ class HarmonyClient:
                     self._hub_config = self._hub_config._replace(
                         config_version=resp_data.get('configVersion'))
                     self._hub_config = self._hub_config._replace(
-                        hub_state=resp_data)
+                        info=resp_data)
                     _LOGGER.debug("%s: HUB configuration version is: %s",
                                   self.name,
                                   self._hub_config.config_version)
-            else:
-                _LOGGER.debug("%s: HUB ID : %s",
-                              self.name,
-                              self._hub_config.info.get('activeRemoteId'))
 
         if self._hub_connection.callbacks.connect is None and \
                 self._callbacks.connect is not None:
@@ -240,12 +181,6 @@ class HarmonyClient:
                 self._callbacks.connect,
                 self._callbacks.disconnect
             )
-
-        _LOGGER.debug("%s: Connected to HUB on IP %s with ID %s.",
-                      self.name,
-                      self._ip_address,
-                      self._hub_config.info.get('activeRemoteId'))
-
         return True
 
     async def close(self) -> None:
@@ -254,17 +189,12 @@ class HarmonyClient:
            This should be called to ensure everything is stopped and
            cancelled out.
         """
-        raise_exception = None
         if self._hub_connection:
             try:
                 with timeout(DEFAULT_TIMEOUT):
                     await self._hub_connection.close()
-            except Exception as e:
-                _LOGGER.debug("%s: Exception occurred during disconnection.",
-                              self.name)
-                raise_exception = e
-                if isinstance(raise_exception, asyncio.TimeoutError):
-                    raise_exception = aioexc.TimeOut
+            except asyncio.TimeoutError:
+                raise aioexc.TimeOut
 
         if self._callback_handler:
             try:
@@ -272,10 +202,6 @@ class HarmonyClient:
                     await self._callback_handler.close()
             except asyncio.TimeoutError:
                 raise aioexc.TimeOut
-
-        if raise_exception is not None:
-            raise raise_exception
-
 
     async def disconnect(self) -> None:
         """Disconnect from Hub"""
@@ -295,34 +221,12 @@ class HarmonyClient:
         async with self._sync_lck:
             try:
                 # Retrieve configuration and HUB version config.
-                with timeout(DEFAULT_TIMEOUT*4):
-                    results = await asyncio.gather(
-                        self._get_config(),
-                        self._retrieve_hub_info(),
-                        return_exceptions=True
-                    )
+                with timeout(DEFAULT_TIMEOUT):
+                    await self._get_config()
             except asyncio.TimeoutError:
                 _LOGGER.error("%s: Timeout trying to retrieve configuraton.",
                               self.name)
                 raise aioexc.TimeOut
-
-            for idx, result in enumerate(results):
-                if isinstance(
-                        result,
-                        aioexc.TimeOut):
-                    # Timeout exception, just put out error then.
-                    if idx == 0:
-                        result_name = 'config'
-                    else:
-                        result_name = 'hub info'
-
-                    _LOGGER.error("%s: Timeout trying to retrieve %s.",
-                                  self.name,
-                                  result_name)
-                    return
-                elif isinstance(result, Exception):
-                    # Other exception, raise it.
-                    raise result
             try:
                 # Retrieve current activity, done only once config received.
                 with timeout(DEFAULT_TIMEOUT):
@@ -335,7 +239,6 @@ class HarmonyClient:
 
         # If we were provided a callback handler then call it now.
         if self._callbacks.config_updated:
-            _LOGGER.debug("%s: Calling callback handler for config_updated", self.name)
             call_callback(
                 callback_handler=self._callbacks.config_updated,
                 result=self._hub_config.config,
@@ -352,16 +255,7 @@ class HarmonyClient:
         _LOGGER.debug("%s: Getting configuration",
                       self.name)
         # Send the command to the HUB
-        try:
-            with timeout(DEFAULT_TIMEOUT/2):
-                response = await self.send_to_hub(command='get_config', send_timeout=DEFAULT_TIMEOUT/4)
-        except (asyncio.TimeoutError, aioexc.TimeOut):
-            try:
-                with timeout(DEFAULT_TIMEOUT/2):
-                    response = await self.send_to_hub(command='get_config', send_timeout=DEFAULT_TIMEOUT/4)
-            except (asyncio.TimeoutError, aioexc.TimeOut):
-                raise aioexc.TimeOut
-
+        response = await self.send_to_hub(command='get_config')
         if not response:
             # There was an issue
             return None
@@ -395,87 +289,11 @@ class HarmonyClient:
 
         return self._hub_config.config
 
-    async def _retrieve_provision_info(self) -> Optional[dict]:
-
-        response = None
-        result = None
-        try:
-            with timeout(DEFAULT_TIMEOUT/2):
-                result = await self.send_to_hub(command='provision_info', post=True, send_timeout=DEFAULT_TIMEOUT/4)
-        except (asyncio.TimeoutError, aioexc.TimeOut):
-            try:
-                _LOGGER.debug("%s: Timeout trying to retrieve provisioning info, retrying.", self.name)
-                with timeout(DEFAULT_TIMEOUT/2):
-                    result = await self.send_to_hub(command='provision_info', post=True, send_timeout=DEFAULT_TIMEOUT/4)
-            except (asyncio.TimeoutError, aioexc.TimeOut):
-                _LOGGER.error("%s: Timeout trying to retrieve provisioning info.", self.name)
-
-        if result is not None:
-            if result.get('code') != 200 and result.get('code') != '200':
-                _LOGGER.error("%s: Incorrect status code %s received trying to "
-                              "get provisioning info for %s",
-                              self.name,
-                              result.get('code'),
-                              self._ip_address)
-            else:
-                self._hub_config = self._hub_config._replace(
-                    info=result.get('data'))
-                response = self._hub_config.info
-
-        return response
-
-    async def _retrieve_discovery_info(self) -> None:
-
-        result = None
-        try:
-            with timeout(DEFAULT_TIMEOUT/2):
-                result = await self.send_to_hub(command='discovery', post=False, send_timeout=DEFAULT_TIMEOUT/4)
-        except (asyncio.TimeoutError, aioexc.TimeOut):
-            try:
-                _LOGGER.debug("%s: Timeout trying to retrieve discovery info, retrying", self.name)
-                with timeout(DEFAULT_TIMEOUT/2):
-                    result = await self.send_to_hub(command='discovery', post=False, send_timeout=DEFAULT_TIMEOUT/4)
-            except (asyncio.TimeoutError, aioexc.TimeOut):
-                _LOGGER.error("%s: Timeout trying to retrieve discovery info.", self.name)
-
-        if result is not None:
-            if result.get('code') != 200 and result.get('code') != '200':
-                _LOGGER.error("%s: Incorrect status code %s received trying to "
-                              "get provisioning info for %s",
-                              self.name,
-                              result.get('code'),
-                              self._ip_address)
-            else:
-                self._hub_config = self._hub_config._replace(
-                    discover_info=result.get('data'))
-
-    async def _retrieve_hub_info(self) -> Optional[dict]:
-        """Retrieve some information from the Hub."""
-        # Send the command to the HUB
-
-        response = None
-
-        results = await asyncio.gather(
-            self._retrieve_provision_info(),
-            self._retrieve_discovery_info(),
-            return_exceptions=True
-        )
-        for idx, result in enumerate(results):
-            if isinstance(result, Exception):
-                raise result
-
-            if idx == 0:
-                response = result
-
-        return response
-
     async def send_to_hub(self,
                           command: str,
                           params: dict = None,
                           msgid: str = None,
-                          wait: bool = True,
-                          post: bool = False,
-                          send_timeout: int = DEFAULT_TIMEOUT) -> Union[dict, bool]:
+                          wait: bool = True) -> Union[dict, bool]:
 
         if msgid is None:
             msgid = str(uuid4())
@@ -499,30 +317,27 @@ class HarmonyClient:
                                   msgid=msgid)
 
         try:
-            with timeout(send_timeout):
-                send_response = await self._hub_connection.hub_send(
+            with timeout(DEFAULT_TIMEOUT):
+                if await self._hub_connection.hub_send(
                         command='{}?{}'.format(
                             HUB_COMMANDS[command]['mime'],
                             HUB_COMMANDS[command]['command']
                         ),
                         params=params,
                         msgid=msgid,
-                        post=post,
-                )
-                if send_response is None:
+                        wait=wait
+                ) is None:
                     # There was an issue
                     return False
         except asyncio.TimeoutError:
             raise aioexc.TimeOut
 
-        if asyncio.isfuture(send_response):
-            response = send_response
-        elif not wait:
+        if not wait:
             return True
 
         # Wait for the response to be available.
         try:
-            with timeout(send_timeout):
+            with timeout(DEFAULT_TIMEOUT):
                 await response
         except asyncio.TimeoutError:
             raise aioexc.TimeOut
@@ -534,20 +349,12 @@ class HarmonyClient:
         _LOGGER.debug("%s: Retrieving current activity", self.name)
 
         # Send the command to the HUB
-
         try:
-            with timeout(DEFAULT_TIMEOUT/2):
-                response = await self.send_to_hub(command='get_current_activity', send_timeout=DEFAULT_TIMEOUT/4)
-        except (asyncio.TimeoutError, aioexc.TimeOut):
-            _LOGGER.debug("%s: Timeout trying to retrieve current activity, retrying.",
+            response = await self.send_to_hub(command='get_current_activity')
+        except aioexc.TimeOut:
+            _LOGGER.error("%s: Timeout trying to retrieve current activity.",
                           self.name)
-            try:
-                with timeout(DEFAULT_TIMEOUT/2):
-                    response = await self.send_to_hub(command='get_current_activity', send_timeout=DEFAULT_TIMEOUT/4)
-            except (asyncio.TimeoutError, aioexc.TimeOut):
-                _LOGGER.error("%s: Timeout trying to retrieve current activity.",
-                              self.name)
-                response = None
+            response = None
 
         if not response:
             # There was an issue
@@ -569,7 +376,6 @@ class HarmonyClient:
 
         # If we were provided a callback handler then call it now.
         if self._callbacks.new_activity:
-            _LOGGER.debug("%s: Calling callback handler for new_activity", self.name)
             call_callback(
                 callback_handler=self._callbacks.new_activity,
                 result=(self._current_activity_id,
@@ -607,6 +413,8 @@ class HarmonyClient:
                               current_hub_config_version)
                 self._hub_config = self._hub_config._replace(
                     config_version=current_hub_config_version)
+                self._hub_config = self._hub_config._replace(
+                    info=resp_data)
                 # Get all the HUB information.
                 await self.refresh_info_from_hub()
 
@@ -633,7 +441,6 @@ class HarmonyClient:
 
         # If we were provided a callback handler then call it now.
         if self._callbacks.new_activity:
-            _LOGGER.debug("%s: Calling callback handler for new_activity", self.name)
             call_callback(
                 callback_handler=self._callbacks.new_activity,
                 result=(self._current_activity_id,
@@ -642,49 +449,6 @@ class HarmonyClient:
                         ),
                 callback_uuid=self._ip_address,
                 callback_name='new_activity_callback'
-            )
-
-    # pylint: disable=broad-except
-    async def _update_start_activity_callback(self,
-                                        message: dict = None) -> None:
-        """Update current activity when changed."""
-        _LOGGER.debug("%s: New activity starting notification", self.name)
-
-        message_data = message.get('data')
-        if message_data is not None and message_data.get('activityStatus') == 0:
-            # The HUB sends a power off notification again that it is starting when it is done
-            # thus intercepting this so we do not redo the callback.
-            if int(message_data.get('activityId')) == -1 and self._current_activity_id == -1:
-                return
-
-            self._current_activity_id = -1
-            _LOGGER.debug("%s: Powering off from activity: %s(%s)",
-                          self.name,
-                          self.get_activity_name(self._current_activity_id),
-                          self._current_activity_id)
-            self._current_activity_id = -1
-        else:
-            if message_data is not None:
-                self._current_activity_id = int(message_data.get('activityId'))
-            else:
-                self._current_activity_id = None
-
-            _LOGGER.debug("%s: New activity starting: %s(%s)",
-                          self.name,
-                          self.get_activity_name(self._current_activity_id),
-                          self._current_activity_id)
-
-        # If we were provided a callback handler then call it now.
-        if self._callbacks.new_activity_starting:
-            _LOGGER.debug("%s: Calling callback handler for new_activity_starting", self.name)
-            call_callback(
-                callback_handler=self._callbacks.new_activity_starting,
-                result=(self._current_activity_id,
-                        self.get_activity_name(
-                            self._current_activity_id)
-                        ),
-                callback_uuid=self._ip_address,
-                callback_name='new_activity_starting_callback'
             )
 
     # pylint: disable=too-many-statements
@@ -909,7 +673,7 @@ class HarmonyClient:
     async def _send_command(self,
                             command: SendCommandDevice,
                             callback_handler: Handler) ->\
-            Tuple[Optional[str], Optional[str]]:
+            Optional[Tuple[str, str]]:
         """Send a command to specified device
 
         :param command: Command to send to the device. (device, command, delay)
@@ -929,9 +693,9 @@ class HarmonyClient:
             "status": "press",
             "timestamp": '0',
             "verb": "render",
-            "action": '{{"command":: "{}",'
-                      '"type":: "IRCommand",'
-                      '"deviceId":: "{}"}}'.format(command.command,
+            "action": '{{"command": "{}",'
+                      '"type": "IRCommand",'
+                      '"deviceId": "{}"}}'.format(command.command,
                                                   command.device)
         }
         msgid_press = str(uuid4())
@@ -953,7 +717,6 @@ class HarmonyClient:
             await asyncio.sleep(command.delay)
 
         params['status'] = 'release'
-
         msgid_release = str(uuid4())
         # Register the handler for this command.
         self.register_handler(handler=callback_handler,
