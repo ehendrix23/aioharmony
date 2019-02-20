@@ -107,15 +107,15 @@ async def start_activity(client, args):
         if activity_id:
             print('Found activity named %s (id %s)' % (args.activity,
                                                        activity_id))
-
     if activity_id:
         status = await client.start_activity(activity_id)
 
         if status[0]:
-            print('Started Actvivity, message: ', status[1])
+            print('Started Activity, message: ', status[1])
         else:
             print('Activity start failed: ', status[1])
-
+    else:
+        print('Invalid activity: ', args.activity)
 
 async def power_off(client, _):
     """Power off Harmony Hub.

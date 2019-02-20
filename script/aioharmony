@@ -1,0 +1,12 @@
+# -*- coding: utf-8 -*-
+import re
+import sys
+import os.path
+
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from aioharmony.__main__ import main
+
+if __name__ == '__main__':
+    sys.argv[0] = re.sub(r'(-script\.pyw?|\.exe)?$', '', sys.argv[0])
+    sys.exit(main())
