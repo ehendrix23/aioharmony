@@ -19,32 +19,32 @@ DEFAULT_HARMONY_MIME = 'vnd.logitech.harmony/vnd.logitech.harmony.engine'
 # The HUB commands that can be send
 #
 HUB_COMMANDS = {
-    'change_channel':       {
-        'mime':    'harmony.engine',
+    'change_channel': {
+        'mime': 'harmony.engine',
         'command': 'changeChannel'
     },
-    'get_current_state':    {
+    'get_current_state': {
         'mime': 'vnd.logitech.connect/vnd.logitech.statedigest',
         'command': 'get'
     },
-    'get_config':           {
-        'mime':    DEFAULT_HARMONY_MIME,
+    'get_config': {
+        'mime': DEFAULT_HARMONY_MIME,
         'command': 'config'
     },
     'get_current_activity': {
-        'mime':    DEFAULT_HARMONY_MIME,
+        'mime': DEFAULT_HARMONY_MIME,
         'command': 'getCurrentActivity'
     },
-    'send_command':         {
-        'mime':    DEFAULT_HARMONY_MIME,
+    'send_command': {
+        'mime': DEFAULT_HARMONY_MIME,
         'command': 'holdAction'
     },
-    'start_activity':       {
-        'mime':    'harmony.activityengine',
+    'start_activity': {
+        'mime': 'harmony.activityengine',
         'command': 'runactivity'
     },
-    'sync':                 {
-        'mime':    'setup.sync',
+    'sync': {
+        'mime': 'setup.sync',
         'command': None
     }
 }
