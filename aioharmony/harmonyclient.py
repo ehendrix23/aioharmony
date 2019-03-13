@@ -142,9 +142,6 @@ class HarmonyClient:
             return False
         else:
             _LOGGER.debug("%s: XMPP is enabled", self.name)
-            _LOGGER.warning("%s: 10 minute delay due to known issue with "
-                            "slixmpp", self.name)
-            await asyncio.sleep(600)
             from aioharmony.hubconnector_xmpp import HubConnector
 
         self._hub_connection = HubConnector(
