@@ -120,6 +120,42 @@ class HarmonyClient:
     def current_activity_id(self):
         return self._current_activity_id
 
+    async def _websocket_or_xmpp(self) -> bool:
+        """ Determine if XMPP is enabled, if not fall-back to web sockets.
+        """
+
+        try:
+            _, _ = await asyncio.open_connection(host=self._ip_address,
+                                                 port=DEFAULT_XMPP_HUB_PORT,
+                                                 loop=self._loop
+                                                 )
+        except ConnectionRefusedError:
+            _LOGGER.warning("%s: XMPP is not enabled, using web sockets "
+                            "however this might not work with future Harmony "
+                            "firmware updates, please enable XMPP",
+                            self.name)
+            from aioharmony.hubconnector_websocket import HubConnector
+        except OSError as exc:
+            _LOGGER.error("%s: Unable to determine if XMPP is enabled: %s",
+                          self.name,
+                          exc)
+            return False
+        else:
+            _LOGGER.debug("%s: XMPP is enabled", self.name)
+            _LOGGER.warning("%s: 10 minute delay due to known issue with "
+                            "slixmpp", self.name)
+            await asyncio.sleep(600)
+            from aioharmony.hubconnector_xmpp import HubConnector
+
+        self._hub_connection = HubConnector(
+            ip_address=self._ip_address,
+            callbacks=ConnectorCallbackType(
+                None,
+                self._callbacks.disconnect
+            ),
+            response_queue=self._response_queue)
+        return True
+
     async def connect(self) -> bool:
         """
 
@@ -127,6 +163,12 @@ class HarmonyClient:
         :rtype: bool
         :raises: :class:`~aioharmony.exceptions.TimeOut`
         """
+
+        if self._hub_connection is None:
+            if not await self._websocket_or_xmpp():
+                return False
+
+
         try:
             with timeout(DEFAULT_TIMEOUT):
                 if not await self._hub_connection.hub_connect():
