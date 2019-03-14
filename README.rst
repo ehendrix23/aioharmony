@@ -16,9 +16,7 @@ of `bkanuka/pyharmony <https://github.com/bkanuka/pyharmony>`__ with the intent 
 Protocol
 --------
 
-As the harmony protocol is being worked out, notes will be in PROTOCOL.md. Currently it is using web sockets
-due to a change by Logitech. Logitech has informed they will re-open XMPP sometime in January/2019. Once re-opened
-this library will be moved to use XMPP.
+As the harmony protocol is being worked out, notes will be in PROTOCOL.md.
 
 Status
 ------
@@ -105,14 +103,13 @@ Release Notes
     - Upon reconnect, errors will be logged on 1st try only, any subsequent retry until connection is successful will
       only provide DEBUG log entries.
 0.1.7. Fixed:
-    NOTE: This version will ONLY work with 4.15.250 or potentially higher. It will not work with lower versions!
     - Fix traceback if no configuration retrieved or items missing from configuration (i.e. no activities)
     - Retrieve current activity only after retrieving configuration
 0.1.8. Fixed:
+    NOTE: This version will ONLY work with 4.15.250 or potentially higher. It will not work with lower versions!
+
     - Fix traceback if HUB info is not received.
     - Fix for new HUB version 4.15.250. (Thanks to `reneboer <https://github.com/reneboer>`__ for providing the quick fix).
-
-     NOTE: This version will ONLY work with 4.15.250 or potentially higher. It will not work with lower versions!
 0.1.9. Fixed:
     - Fixed "Network unreachable" or "Host unreachable" on certain installations (i.e. in Docker, HassIO)
 0.1.10. Changed:
@@ -124,6 +121,12 @@ Release Notes
 0.1.12. Fixed/Changed:
     - Fixed issue where connection debug messages would not be shown on failed reconnects.
     - Added debug log entry when connected to HUB.
+0.2.0. New:
+    - Support for XMPP. If XMPP is enabled on Hub then that will be used, otherwise fallback to web sockets.
+      There are no changes to the API for this.
+    - Log entries from responsehandler class will now include ip address of HUB for easier identification
+
+
 
 TODO
 ----
