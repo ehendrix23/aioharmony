@@ -71,7 +71,9 @@ class HarmonyClient:
             response_queue=self._response_queue)
         # Get the Response Handler
         self._callback_handler = ResponseHandler(
-            message_queue=self._response_queue)
+            message_queue=self._response_queue,
+            name=self.name
+        )
 
         # Create the lock for sending commands or starting an activity
         self._snd_cmd_act_lck = asyncio.Lock()
