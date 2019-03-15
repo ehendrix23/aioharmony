@@ -6,6 +6,7 @@ responses."""
 
 import asyncio
 import logging
+import socket
 from contextlib import suppress
 from typing import NamedTuple, Optional
 from urllib.parse import urlparse
@@ -86,8 +87,15 @@ class HubConnector:
         if self._aiohttp_session:
             return self._aiohttp_session
 
+        # Specify socket
+        conn = aiohttp.TCPConnector(
+            family=socket.AF_INET,
+            verify_ssl=False,
+        )
+
         session_timeout = aiohttp.ClientTimeout(connect=DEFAULT_TIMEOUT)
-        self._aiohttp_session = aiohttp.ClientSession(timeout=session_timeout)
+        self._aiohttp_session = aiohttp.ClientSession(connector=conn,
+                                                      timeout=session_timeout)
         return self._aiohttp_session
 
     async def _get_remote_id(self) -> Optional[str]:
