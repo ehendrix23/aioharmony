@@ -113,6 +113,8 @@ Release Notes
     - Fix for new HUB version 4.15.250. (Thanks to `reneboer <https://github.com/reneboer>`__ for providing the quick fix).
 0.1.9. Fixed:
     - Fixed "Network unreachable" or "Host unreachable" on certain installations (i.e. in Docker, HassIO)
+0.1.10. Changed:
+    - On reconnect the wait time will now start at 1 seconds and double every time with a maximum of 30 seconds.
 
 TODO
 ----
