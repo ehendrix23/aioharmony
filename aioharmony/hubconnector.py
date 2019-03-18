@@ -231,8 +231,10 @@ class HubConnector:
         _LOGGER.debug("%s: Connection closed, reconnecting",
                       self._ip_address)
         is_reconnect = False
+        sleep_time=1
         while not await self.connect(is_reconnect=is_reconnect):
-            await asyncio.sleep(10)
+            await asyncio.sleep(sleep_time)
+            sleep_time = min(sleep_time * 2, 30)
             is_reconnect = True
 
     async def send(self, command, params, msgid=None) -> Optional[str]:
