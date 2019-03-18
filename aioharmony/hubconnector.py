@@ -244,7 +244,7 @@ class HubConnector:
         # Set web socket to none allowing for reconnect.
         self._websocket = None
         is_reconnect = False
-        sleep_time=1
+        sleep_time = 1
         while not await self.connect(is_reconnect=is_reconnect):
             await asyncio.sleep(sleep_time)
             sleep_time = sleep_time * 2
