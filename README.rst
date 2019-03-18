@@ -116,6 +116,7 @@ Release Notes
     - Fixed "Network unreachable" or "Host unreachable" on certain installations (i.e. in Docker, HassIO)
 0.1.10. Changed:
     - On reconnect the wait time will now start at 1 seconds and double every time with a maximum of 30 seconds.
+    - Reconnect sometimes might not work if request to close was received over web socket but it never was closed.
 
 TODO
 ----
