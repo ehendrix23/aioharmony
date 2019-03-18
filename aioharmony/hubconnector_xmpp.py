@@ -12,6 +12,7 @@ from uuid import uuid4
 
 import slixmpp
 from async_timeout import timeout
+
 from slixmpp.exceptions import IqTimeout
 from slixmpp.xmlstream import ET
 from slixmpp.xmlstream.handler.callback import Callback
