@@ -230,6 +230,19 @@ class HubConnector:
 
         _LOGGER.debug("%s: Connection closed, reconnecting",
                       self._ip_address)
+
+        async with self._connect_disconnect_lock:
+            # It is possible that the web socket hasn't been closed yet,
+            # if this is the case then close it now.
+            if self._websocket is not None and not self._websocket.closed:
+                _LOGGER.debug("%s: Connection half-closed, closing first",
+                              self._ip_address)
+                with suppress(asyncio.TimeoutError),\
+                     timeout(DEFAULT_TIMEOUT):
+                    await self._websocket.close()
+
+        # Set web socket to none allowing for reconnect.
+        self._websocket = None
         is_reconnect = False
         sleep_time=1
         while not await self.connect(is_reconnect=is_reconnect):
@@ -353,7 +366,7 @@ class HubConnector:
         _LOGGER.debug("%s: Listener stopped.", self._ip_address)
 
         # If we exited the loop due to connection closed then
-        # call reconnect to deterimine if we should reconnect again.
+        # call reconnect to determine if we should reconnect again.
         if not have_connection:
             await self._reconnect()
 
