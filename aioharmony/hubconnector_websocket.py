@@ -234,8 +234,11 @@ class HubConnector:
                       self._ip_address)
         self._connected = False
         is_reconnect = False
+        sleep_time = 1
         while not await self.hub_connect(is_reconnect=is_reconnect):
-            await asyncio.sleep(10)
+            await asyncio.sleep(sleep_time)
+            sleep_time = sleep_time * 2
+            sleep_time = min(sleep_time, 30)
             is_reconnect = True
 
     async def hub_send(self, command, params, msgid=None) -> \
