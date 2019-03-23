@@ -117,6 +117,9 @@ Release Notes
 0.1.10. Changed:
     - On reconnect the wait time will now start at 1 seconds and double every time with a maximum of 30 seconds.
     - Reconnect sometimes might not work if request to close was received over web socket but it never was closed.
+0.1.11. Changed:
+    - Timeout changed from 30 seconds to 5 seconds for network activity.
+    - For reconnect, first wait for 1 second before starting reconnects.
 
 TODO
 ----

@@ -20,7 +20,7 @@ from aioharmony.helpers import call_callback
 
 DEFAULT_DOMAIN = 'svcs.myharmony.com'
 DEFAULT_HUB_PORT = '8088'
-DEFAULT_TIMEOUT = 30
+DEFAULT_TIMEOUT = 5
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ class HubConnector:
             verify_ssl=False,
         )
 
-        session_timeout = aiohttp.ClientTimeout(connect=DEFAULT_TIMEOUT)
+        session_timeout = aiohttp.ClientTimeout(connect=5)
         self._aiohttp_session = aiohttp.ClientSession(connector=conn,
                                                       timeout=session_timeout)
         return self._aiohttp_session
@@ -252,6 +252,8 @@ class HubConnector:
 
         is_reconnect = False
         sleep_time = 1
+        # Wait for 1 second before trying reconnects.
+        await asyncio.sleep(sleep_time)
         while not await self.connect(is_reconnect=is_reconnect):
             await asyncio.sleep(sleep_time)
             sleep_time = sleep_time * 2
