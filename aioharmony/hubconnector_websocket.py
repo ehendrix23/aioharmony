@@ -22,7 +22,7 @@ from aioharmony.const import (
 from aioharmony.helpers import call_callback
 
 DEFAULT_DOMAIN = 'svcs.myharmony.com'
-DEFAULT_TIMEOUT = 30
+DEFAULT_TIMEOUT = 5
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -256,6 +256,7 @@ class HubConnector:
         is_reconnect = False
         self._connected = False
         sleep_time = 1
+        await asyncio.sleep(sleep_time)
         while not await self.hub_connect(is_reconnect=is_reconnect):
             await asyncio.sleep(sleep_time)
             sleep_time = sleep_time * 2
