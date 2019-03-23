@@ -26,7 +26,7 @@ from aioharmony.const import (
 from aioharmony.helpers import call_callback
 
 DEFAULT_DOMAIN = 'svcs.myharmony.com'
-DEFAULT_TIMEOUT = 30
+DEFAULT_TIMEOUT = 5
 DEFAULT_USER = 'user@connect.logitech.com/gatorade.'
 DEFAULT_PASSWORD = 'password'
 DEFAULT_NS = 'connect.logitech.com'
@@ -252,6 +252,7 @@ class HubConnector(slixmpp.ClientXMPP):
         self._connected = False
         is_reconnect = False
         sleep_time = 1
+        await asyncio.sleep(sleep_time)
         while True:
             try:
                 if await self.hub_connect(is_reconnect=is_reconnect):
