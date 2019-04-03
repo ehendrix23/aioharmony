@@ -103,14 +103,23 @@ Release Notes
 0.1.6. Fixed:
     - Ignore response code 200 when for sending commands
     - Upon reconnect, errors will be logged on 1st try only, any subsequent retry until connection is successful will
-    only provide DEBUG log entries.
+      only provide DEBUG log entries.
 0.1.7. Fixed:
     - Fix traceback if no configuration retrieved or items missing from configuration (i.e. no activities)
     - Retrieve current activity only after retrieving configuration
 0.1.8. Fixed:
-    NOTE: This version will ONLY work with 4.15.250 or potentially higher. It will not work with lower versions!
     - Fix traceback if HUB info is not received.
     - Fix for new HUB version 4.15.250. (Thanks to `reneboer <https://github.com/reneboer>`__ for providing the quick fix).
+
+     NOTE: This version will ONLY work with 4.15.250 or potentially higher. It will not work with lower versions!
+0.1.9. Fixed:
+    - Fixed "Network unreachable" or "Host unreachable" on certain installations (i.e. in Docker, HassIO)
+0.1.10. Changed:
+    - On reconnect the wait time will now start at 1 seconds and double every time with a maximum of 30 seconds.
+    - Reconnect sometimes might not work if request to close was received over web socket but it never was closed.
+0.1.11. Changed:
+    - Timeout changed from 30 seconds to 5 seconds for network activity.
+    - For reconnect, first wait for 1 second before starting reconnects.
 
 TODO
 ----

@@ -6,6 +6,7 @@ responses."""
 
 import asyncio
 import logging
+import socket
 from contextlib import suppress
 from typing import NamedTuple, Optional
 from urllib.parse import urlparse
@@ -19,7 +20,7 @@ from aioharmony.helpers import call_callback
 
 DEFAULT_DOMAIN = 'svcs.myharmony.com'
 DEFAULT_HUB_PORT = '8088'
-DEFAULT_TIMEOUT = 30
+DEFAULT_TIMEOUT = 5
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -86,8 +87,15 @@ class HubConnector:
         if self._aiohttp_session:
             return self._aiohttp_session
 
-        session_timeout = aiohttp.ClientTimeout(connect=DEFAULT_TIMEOUT)
-        self._aiohttp_session = aiohttp.ClientSession(timeout=session_timeout)
+        # Specify socket
+        conn = aiohttp.TCPConnector(
+            family=socket.AF_INET,
+            verify_ssl=False,
+        )
+
+        session_timeout = aiohttp.ClientTimeout(connect=5)
+        self._aiohttp_session = aiohttp.ClientSession(connector=conn,
+                                                      timeout=session_timeout)
         return self._aiohttp_session
 
     async def _get_remote_id(self) -> Optional[str]:
@@ -111,7 +119,7 @@ class HubConnector:
 
         async with self._connect_disconnect_lock:
             # Return connected if we are already connected.
-            if self._websocket and not self._websocket.closed:
+            if self._websocket is not None and not self._websocket.closed:
                 return True
 
             _LOGGER.debug("%s: Starting connect.", self._ip_address)
@@ -191,8 +199,7 @@ class HubConnector:
             self._connected = False
 
             if self._websocket:
-                with suppress(asyncio.TimeoutError), \
-                     timeout(DEFAULT_TIMEOUT):
+                with suppress(asyncio.TimeoutError), timeout(DEFAULT_TIMEOUT):
                     await self._websocket.close()
 
                 await self._session.close()
@@ -222,9 +229,35 @@ class HubConnector:
 
         _LOGGER.debug("%s: Connection closed, reconnecting",
                       self._ip_address)
+
+        async with self._connect_disconnect_lock:
+            # It is possible that the web socket hasn't been closed yet,
+            # if this is the case then close it now.
+            if self._websocket is not None and not self._websocket.closed:
+                _LOGGER.debug("%s: Web Socket half-closed, closing first",
+                              self._ip_address)
+                with suppress(asyncio.TimeoutError), timeout(DEFAULT_TIMEOUT):
+                    await self._websocket.close()
+
+            if self._aiohttp_session is not None and not \
+                    self._aiohttp_session.closed:
+                _LOGGER.debug("%s: Closing sessions",
+                              self._ip_address)
+                with suppress(asyncio.TimeoutError), timeout(DEFAULT_TIMEOUT):
+                    await self._aiohttp_session.close()
+
+        # Set web socket to none allowing for reconnect.
+        self._websocket = None
+        self._aiohttp_session = None
+
         is_reconnect = False
+        sleep_time = 1
+        # Wait for 1 second before trying reconnects.
+        await asyncio.sleep(sleep_time)
         while not await self.connect(is_reconnect=is_reconnect):
-            await asyncio.sleep(10)
+            await asyncio.sleep(sleep_time)
+            sleep_time = sleep_time * 2
+            sleep_time = min(sleep_time, 30)
             is_reconnect = True
 
     async def send(self, command, params, msgid=None) -> Optional[str]:
@@ -342,7 +375,7 @@ class HubConnector:
         _LOGGER.debug("%s: Listener stopped.", self._ip_address)
 
         # If we exited the loop due to connection closed then
-        # call reconnect to deterimine if we should reconnect again.
+        # call reconnect to determine if we should reconnect again.
         if not have_connection:
             await self._reconnect()
 
