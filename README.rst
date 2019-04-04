@@ -120,6 +120,9 @@ Release Notes
 0.1.11. Changed:
     - Timeout changed from 30 seconds to 5 seconds for network activity.
     - For reconnect, first wait for 1 second before starting reconnects.
+0.1.12. Fixed/Changed:
+    - Fixed issue where connection debug messages would not be shown on failed reconnects.
+    - Added debug log entry when connected to HUB.
 
 TODO
 ----
