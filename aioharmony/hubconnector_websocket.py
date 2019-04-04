@@ -147,30 +147,31 @@ class HubConnector:
                 )
             except (aiohttp.ServerTimeoutError, aiohttp.ClientError,
                     aiohttp.WSServerHandshakeError) as exc:
-                if not is_reconnect:
-                    if isinstance(exc, aiohttp.ServerTimeoutError):
-                        _LOGGER.log(log_level,
-                                    "%s: Connection timed out for hub %s",
-                                    self._ip_address,
-                                    self._remote_id)
-                    elif isinstance(exc, aiohttp.ClientError):
-                        _LOGGER.log(log_level,
-                                    "%s: Exception trying to establish web "
-                                    "socket connection for hub %s: %s",
-                                    self._ip_address,
-                                    self._remote_id,
-                                    exc)
-                    else:
-                        _LOGGER.log(log_level,
-                                    "%s: Invalid status code %s received "
-                                    "trying to connect for hub %s: %s",
-                                    self._ip_address,
-                                    exc.status,
-                                    self._remote_id,
-                                    exc)
+                if isinstance(exc, aiohttp.ServerTimeoutError):
+                    _LOGGER.log(log_level,
+                                "%s: Connection timed out for hub %s",
+                                self._ip_address,
+                                self._remote_id)
+                elif isinstance(exc, aiohttp.ClientError):
+                    _LOGGER.log(log_level,
+                                "%s: Exception trying to establish web "
+                                "socket connection for hub %s: %s",
+                                self._ip_address,
+                                self._remote_id,
+                                exc)
+                else:
+                    _LOGGER.log(log_level,
+                                "%s: Invalid status code %s received "
+                                "trying to connect for hub %s: %s",
+                                self._ip_address,
+                                exc.status,
+                                self._remote_id,
+                                exc)
                 self._websocket = None
                 return False
 
+            _LOGGER.debug("%s: Connected to hub %s", self._ip_address,
+                          self._remote_id)
             # Now put the listener on the loop.
             if not self._listener_task:
                 self._listener_task = asyncio.ensure_future(
