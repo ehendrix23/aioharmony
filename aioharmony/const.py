@@ -12,7 +12,8 @@ from typing import Any, Callable, List, NamedTuple, Optional, Union
 #
 DEFAULT_CMD = 'vnd.logitech.connect'
 DEFAULT_DISCOVER_STRING = '_logitech-reverse-bonjour._tcp.local.'
-DEFAULT_HUB_PORT = '5222'
+DEFAULT_XMPP_HUB_PORT = '5222'
+DEFAULT_WS_HUB_PORT = '8088'
 DEFAULT_HARMONY_MIME = 'vnd.logitech.harmony/vnd.logitech.harmony.engine'
 
 #
@@ -59,6 +60,11 @@ CallbackType = Union[
     asyncio.Event,
     Callable[[object, Optional[Any]], Any]
 ]
+
+ConnectorCallbackType = NamedTuple('ConnectorCallbackType',
+                                   [('connect', Optional[CallbackType]),
+                                    ('disconnect', Optional[CallbackType])
+                                    ])
 
 ClientConfigType = NamedTuple('ClientConfigType',
                               [('config', dict),

@@ -12,7 +12,6 @@ from uuid import uuid4
 
 import slixmpp
 from async_timeout import timeout
-
 from slixmpp.exceptions import IqTimeout
 from slixmpp.xmlstream import ET
 from slixmpp.xmlstream.handler.callback import Callback
@@ -381,4 +380,5 @@ class HubConnector(slixmpp.ClientXMPP):
                      message_received))
 
     async def retrieve_hub_info(self) -> Optional[dict]:
+        """ To retrieve HUB info, not used for XMPP. """
         pass
