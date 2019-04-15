@@ -20,11 +20,11 @@ from async_timeout import timeout
 import aioharmony.exceptions as aioexc
 import aioharmony.handler as handlers
 from aioharmony.const import (
-    CallbackType, ClientConfigType, HUB_COMMANDS, SendCommand,
-    SendCommandDevice, SendCommandResponse
+    CallbackType, ClientConfigType, ConnectorCallbackType,
+    DEFAULT_XMPP_HUB_PORT, HUB_COMMANDS, SendCommand, SendCommandDevice,
+    SendCommandResponse
 )
 from aioharmony.helpers import call_callback, search_dict
-from aioharmony.hubconnector import ConnectorCallbackType, HubConnector
 from aioharmony.responsehandler import Handler, ResponseHandler
 
 _LOGGER = logging.getLogger(__name__)
@@ -58,17 +58,11 @@ class HarmonyClient:
 
         self._hub_config = ClientConfigType({}, {}, None, [], [])
         self._current_activity_id = None
+        self._hub_connection = None
 
         # Get the queue on which JSON responses will be put
         self._response_queue = asyncio.Queue()
-        # Get the Hub Connection
-        self._hub_connection = HubConnector(
-            ip_address=self._ip_address,
-            callbacks=ConnectorCallbackType(
-                None,
-                self._callbacks.disconnect
-            ),
-            response_queue=self._response_queue)
+
         # Get the Response Handler
         self._callback_handler = ResponseHandler(
             message_queue=self._response_queue,
@@ -166,7 +160,6 @@ class HarmonyClient:
         if self._hub_connection is None:
             if not await self._websocket_or_xmpp():
                 return False
-
 
         try:
             with timeout(DEFAULT_TIMEOUT):
@@ -366,7 +359,6 @@ class HarmonyClient:
                         ),
                         params=params,
                         msgid=msgid,
-                        wait=wait
                 ) is None:
                     # There was an issue
                     return False
@@ -714,7 +706,7 @@ class HarmonyClient:
     async def _send_command(self,
                             command: SendCommandDevice,
                             callback_handler: Handler) ->\
-            Optional[Tuple[str, str]]:
+            Tuple[Optional[str], Optional[str]]:
         """Send a command to specified device
 
         :param command: Command to send to the device. (device, command, delay)
