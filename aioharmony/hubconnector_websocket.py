@@ -87,6 +87,7 @@ class HubConnector:
         # Specify socket
         conn = aiohttp.TCPConnector(
             family=socket.AF_INET,
+            enable_cleanup_closed=True,
             verify_ssl=False,
         )
 
