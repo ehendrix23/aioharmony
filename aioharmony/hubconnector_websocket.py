@@ -8,18 +8,20 @@ import asyncio
 import logging
 import socket
 from contextlib import suppress
-from typing import NamedTuple, Optional
+from typing import Optional
 from urllib.parse import urlparse
 from uuid import uuid4
 
 import aiohttp
 from async_timeout import timeout
 
-from aioharmony.handler import CallbackType
+from aioharmony.const import (
+    ConnectorCallbackType,
+    DEFAULT_WS_HUB_PORT as DEFAULT_HUB_PORT
+)
 from aioharmony.helpers import call_callback
 
 DEFAULT_DOMAIN = 'svcs.myharmony.com'
-DEFAULT_HUB_PORT = '8088'
 DEFAULT_TIMEOUT = 5
 
 _LOGGER = logging.getLogger(__name__)
@@ -27,11 +29,6 @@ _LOGGER = logging.getLogger(__name__)
 
 # TODO: Add docstyle comments
 # TODO: Clean up code styling
-
-ConnectorCallbackType = NamedTuple('ConnectorCallbackType',
-                                   [('connect', Optional[CallbackType]),
-                                    ('disconnect', Optional[CallbackType])
-                                    ])
 
 
 # pylint: disable=too-many-instance-attributes
@@ -78,7 +75,7 @@ class HubConnector:
            cancelled out.
         """
         # Close connections.
-        await self.disconnect()
+        await self.hub_disconnect()
 
     @property
     def _session(self):
@@ -90,10 +87,11 @@ class HubConnector:
         # Specify socket
         conn = aiohttp.TCPConnector(
             family=socket.AF_INET,
+            enable_cleanup_closed=True,
             verify_ssl=False,
         )
 
-        session_timeout = aiohttp.ClientTimeout(connect=5)
+        session_timeout = aiohttp.ClientTimeout(connect=DEFAULT_TIMEOUT)
         self._aiohttp_session = aiohttp.ClientSession(connector=conn,
                                                       timeout=session_timeout)
         return self._aiohttp_session
@@ -111,7 +109,7 @@ class HubConnector:
                     DEFAULT_DOMAIN
         return self._remote_id
 
-    async def connect(self, is_reconnect: bool = False) -> bool:
+    async def hub_connect(self, is_reconnect: bool = False) -> bool:
         """Connect to Hub Web Socket"""
         # Acquire the lock.
         if self._connect_disconnect_lock.locked():
@@ -175,7 +173,6 @@ class HubConnector:
 
             _LOGGER.debug("%s: Connected to hub %s", self._ip_address,
                           self._remote_id)
-
             # Now put the listener on the loop.
             if not self._listener_task:
                 self._listener_task = asyncio.ensure_future(
@@ -189,9 +186,10 @@ class HubConnector:
                           callback_uuid=self._ip_address,
                           callback_name='connected'
                           )
+            _LOGGER.debug("%s: Connected to hub", self._ip_address)
             return True
 
-    async def disconnect(self) -> None:
+    async def hub_disconnect(self) -> None:
         """Disconnect from Hub"""
         _LOGGER.debug("%s: Disconnecting", self._ip_address)
         # Acquire the lock.
@@ -229,6 +227,11 @@ class HubConnector:
                           self._ip_address)
             return
 
+        if not self._auto_reconnect:
+            _LOGGER.debug("%s: Connection closed, auto-reconnect disabled",
+                          self._ip_address)
+            return
+
         _LOGGER.debug("%s: Connection closed, reconnecting",
                       self._ip_address)
 
@@ -253,19 +256,20 @@ class HubConnector:
         self._aiohttp_session = None
 
         is_reconnect = False
+        self._connected = False
         sleep_time = 1
-        # Wait for 1 second before trying reconnects.
         await asyncio.sleep(sleep_time)
-        while not await self.connect(is_reconnect=is_reconnect):
+        while not await self.hub_connect(is_reconnect=is_reconnect):
             await asyncio.sleep(sleep_time)
             sleep_time = sleep_time * 2
             sleep_time = min(sleep_time, 30)
             is_reconnect = True
 
-    async def send(self, command, params, msgid=None) -> Optional[str]:
+    async def hub_send(self, command, params, msgid=None) -> \
+            Optional[str]:
         """Send a payload request to Harmony Hub and return json response."""
         # Make sure we're connected.
-        if not await self.connect():
+        if not await self.hub_connect():
             return
 
         if not msgid:
@@ -291,7 +295,8 @@ class HubConnector:
 
         return msgid
 
-    async def post(self, url, json_request, headers=None) -> Optional[dict]:
+    async def hub_post(self, url, json_request, headers=None) -> \
+            Optional[dict]:
         """Post a json request and return the response."""
         _LOGGER.debug("%s: Sending post request: %s",
                       self._ip_address,
@@ -377,7 +382,7 @@ class HubConnector:
         _LOGGER.debug("%s: Listener stopped.", self._ip_address)
 
         # If we exited the loop due to connection closed then
-        # call reconnect to determine if we should reconnect again.
+        # call reconnect to deterimine if we should reconnect again.
         if not have_connection:
             await self._reconnect()
 
@@ -398,7 +403,7 @@ class HubConnector:
             "params": {}
         }
 
-        response = await self.post(url, json_request, headers)
+        response = await self.hub_post(url, json_request, headers)
 
         if response is not None:
             return response.get('data')

@@ -56,9 +56,11 @@ class ResponseHandler:
     """
 
     def __init__(self,
-                 message_queue: asyncio.Queue) -> None:
+                 message_queue: asyncio.Queue,
+                 name: str = None) -> None:
         """"""
         self._message_queue = message_queue
+        self._name = name
         self._handler_list = []
 
         self._callback_task = asyncio.ensure_future(self._callback_handler())
@@ -106,15 +108,17 @@ class ResponseHandler:
             expiration = datetime.now(timezone.utc) + expiration
 
         if expiration is None:
-            _LOGGER.debug("Registering handler %s with UUID %s",
+            _LOGGER.debug("%s: Registering handler %s with UUID %s",
+                          self._name,
                           handler.handler_name,
                           handler_uuid)
         else:
             if expiration.tzinfo is None:
                 expiration = expiration.replace(tzinfo=timezone.utc)
 
-            _LOGGER.debug("Registering handler %s with UUID %s that will "
+            _LOGGER.debug("%s: Registering handler %s with UUID %s that will "
                           "expire on %s",
+                          self._name,
                           handler.handler_name,
                           handler_uuid,
                           expiration.astimezone())
@@ -138,7 +142,8 @@ class ResponseHandler:
                  not found
         :rtype: bool
         """
-        _LOGGER.debug("Unregistering handler with UUID %s",
+        _LOGGER.debug("%s: Unregistering handler with UUID %s",
+                      self._name,
                       handler_uuid)
         found_uuid = False
         for index in [index for index, element in enumerate(self._handler_list)
@@ -206,7 +211,8 @@ class ResponseHandler:
             if handler.msgid is not None:
                 if message.get('id') is None or \
                         message.get('id') != handler.msgid:
-                    _LOGGER.debug("No match on msgid for %s",
+                    _LOGGER.debug("%s: No match on msgid for %s",
+                                  self._name,
                                   handler.handler.handler_name)
                     continue
 
@@ -214,11 +220,14 @@ class ResponseHandler:
                 if not self._handler_match(
                         dict_list=handler.handler.resp_json,
                         message=message):
-                    _LOGGER.debug("No match for handler %s",
+                    _LOGGER.debug("%s: No match for handler %s",
+                                  self._name,
                                   handler.handler.handler_name)
                     continue
 
-            _LOGGER.debug("Match for %s", handler.handler.handler_name)
+            _LOGGER.debug("%s: Match for %s",
+                          self._name,
+                          handler.handler.handler_name)
             callback_list.append(handler)
 
         return callback_list
@@ -247,8 +256,9 @@ class ResponseHandler:
         for handler in handler_list:
             if handler.expiration is not None:
                 if datetime.now(timezone.utc) > handler.expiration:
-                    _LOGGER.debug("Handler %s with UUID %s has "
+                    _LOGGER.debug("%s: Handler %s with UUID %s has "
                                   "expired, removing: %s",
+                                  self._name,
                                   handler.handler.handler_name,
                                   handler.handler_uuid,
                                   handler.expiration.astimezone())
@@ -263,7 +273,7 @@ class ResponseHandler:
         Listens on the queue for JSON messages and then processes them by
         calling any handler(s)
         """
-        _LOGGER.debug("Callback handler started")
+        _LOGGER.debug("%s: Callback handler started", self._name)
 
         while True:
             # Put everything here in a try block, we do not want this
@@ -271,7 +281,9 @@ class ResponseHandler:
             try:
                 # Wait for something to appear on the queue.
                 message = await self._message_queue.get()
-                _LOGGER.debug("Message received: %s", message)
+                _LOGGER.debug("%s: Message received: %s",
+                              self._name,
+                              message)
 
                 # Go through list and call
                 for handler in self._get_handlers(message=message):
@@ -299,19 +311,25 @@ class ResponseHandler:
                 # nothing in the queue.
                 if self._message_queue.empty():
                     # Go through list and remove all expired ones.
-                    _LOGGER.debug("Checking for expired handlers")
+                    _LOGGER.debug("%s: Checking for expired handlers",
+                                  self._name
+                                  )
                     self._unregister_expired_handlers()
 
             except asyncio.CancelledError:
-                _LOGGER.debug("Received STOP for callback handler")
+                _LOGGER.debug("%s: Received STOP for callback handler",
+                              self._name
+                              )
                 break
 
             # Need to catch everything here to prevent an issue in a
             # from causing the handler to exit.
             except Exception as exc:
-                _LOGGER.exception("Exception in callback handler: %s", exc)
+                _LOGGER.exception("%s: Exception in callback handler: %s",
+                                  self._name,
+                                  exc)
 
         # Reset the queue.
         self._message_queue = asyncio.Queue()
 
-        _LOGGER.debug("Callback handler stopped.")
+        _LOGGER.debug("%s: Callback handler stopped.", self._name)

@@ -12,18 +12,19 @@ import asyncio
 import copy
 import logging
 from datetime import timedelta
-from typing import List, NamedTuple, Optional, Union
+from typing import List, NamedTuple, Optional, Tuple, Union
 from uuid import uuid4
+
 from async_timeout import timeout
 
 import aioharmony.exceptions as aioexc
 import aioharmony.handler as handlers
 from aioharmony.const import (
-    CallbackType, ClientConfigType, HUB_COMMANDS, SendCommand,
-    SendCommandDevice, SendCommandResponse
+    CallbackType, ClientConfigType, ConnectorCallbackType,
+    DEFAULT_XMPP_HUB_PORT, HUB_COMMANDS, SendCommand, SendCommandDevice,
+    SendCommandResponse
 )
 from aioharmony.helpers import call_callback, search_dict
-from aioharmony.hubconnector import HubConnector, ConnectorCallbackType
 from aioharmony.responsehandler import Handler, ResponseHandler
 
 _LOGGER = logging.getLogger(__name__)
@@ -57,20 +58,16 @@ class HarmonyClient:
 
         self._hub_config = ClientConfigType({}, {}, None, [], [])
         self._current_activity_id = None
+        self._hub_connection = None
 
         # Get the queue on which JSON responses will be put
         self._response_queue = asyncio.Queue()
-        # Get the Hub Connection
-        self._hub_connection = HubConnector(
-            ip_address=self._ip_address,
-            callbacks=ConnectorCallbackType(
-                None,
-                self._callbacks.disconnect
-            ),
-            response_queue=self._response_queue)
+
         # Get the Response Handler
         self._callback_handler = ResponseHandler(
-            message_queue=self._response_queue)
+            message_queue=self._response_queue,
+            name=self.name
+        )
 
         # Create the lock for sending commands or starting an activity
         self._snd_cmd_act_lck = asyncio.Lock()
@@ -119,6 +116,39 @@ class HarmonyClient:
     def current_activity_id(self):
         return self._current_activity_id
 
+    async def _websocket_or_xmpp(self) -> bool:
+        """ Determine if XMPP is enabled, if not fall-back to web sockets.
+        """
+
+        try:
+            _, _ = await asyncio.open_connection(host=self._ip_address,
+                                                 port=DEFAULT_XMPP_HUB_PORT,
+                                                 loop=self._loop
+                                                 )
+        except ConnectionRefusedError:
+            _LOGGER.warning("%s: XMPP is not enabled, using web sockets "
+                            "however this might not work with future Harmony "
+                            "firmware updates, please enable XMPP",
+                            self.name)
+            from aioharmony.hubconnector_websocket import HubConnector
+        except OSError as exc:
+            _LOGGER.error("%s: Unable to determine if XMPP is enabled: %s",
+                          self.name,
+                          exc)
+            return False
+        else:
+            _LOGGER.debug("%s: XMPP is enabled", self.name)
+            from aioharmony.hubconnector_xmpp import HubConnector
+
+        self._hub_connection = HubConnector(
+            ip_address=self._ip_address,
+            callbacks=ConnectorCallbackType(
+                None,
+                self._callbacks.disconnect
+            ),
+            response_queue=self._response_queue)
+        return True
+
     async def connect(self) -> bool:
         """
 
@@ -126,9 +156,14 @@ class HarmonyClient:
         :rtype: bool
         :raises: :class:`~aioharmony.exceptions.TimeOut`
         """
+
+        if self._hub_connection is None:
+            if not await self._websocket_or_xmpp():
+                return False
+
         try:
             with timeout(DEFAULT_TIMEOUT):
-                if not await self._hub_connection.connect():
+                if not await self._hub_connection.hub_connect():
                     return False
         except asyncio.TimeoutError:
             raise aioexc.TimeOut
@@ -159,6 +194,8 @@ class HarmonyClient:
                 if resp_data is not None:
                     self._hub_config = self._hub_config._replace(
                         config_version=resp_data.get('configVersion'))
+                    self._hub_config = self._hub_config._replace(
+                        info=resp_data)
                     _LOGGER.debug("%s: HUB configuration version is: %s",
                                   self.name,
                                   self._hub_config.config_version)
@@ -207,7 +244,7 @@ class HarmonyClient:
                       self._ip_address)
         try:
             with timeout(DEFAULT_TIMEOUT):
-                await self._hub_connection.disconnect()
+                await self._hub_connection.hub_disconnect()
         except asyncio.TimeoutError:
             raise aioexc.TimeOut
 
@@ -219,33 +256,11 @@ class HarmonyClient:
             try:
                 # Retrieve configuration and HUB version config.
                 with timeout(DEFAULT_TIMEOUT):
-                    results = await asyncio.gather(
-                        self._get_config(),
-                        self._retrieve_hub_info(),
-                        return_exceptions=True
-                    )
+                    await self._get_config()
             except asyncio.TimeoutError:
+                _LOGGER.error("%s: Timeout trying to retrieve configuraton.",
+                              self.name)
                 raise aioexc.TimeOut
-            for idx, result in enumerate(results):
-                if isinstance(
-                        result,
-                        aioexc.TimeOut):
-                    # Timeout exception, just put out error then.
-                    if idx == 0:
-                        result_name = 'config'
-                    elif idx == 1:
-                        result_name = 'hub_info'
-                    else:
-                        result_name = 'get_current_activity'
-
-                    _LOGGER.error("%s: Timeout trying to retrieve %s.",
-                                  self.name,
-                                  result_name)
-                    return
-                elif isinstance(result, Exception):
-                    # Other exception, raise it.
-                    raise result
-
             try:
                 # Retrieve current activity, done only once config received.
                 with timeout(DEFAULT_TIMEOUT):
@@ -308,19 +323,6 @@ class HarmonyClient:
 
         return self._hub_config.config
 
-    async def _retrieve_hub_info(self) -> Optional[dict]:
-        """Retrieve some information from the Hub."""
-        try:
-            with timeout(DEFAULT_TIMEOUT):
-                response = await self._hub_connection.retrieve_hub_info()
-        except asyncio.TimeoutError:
-            raise aioexc.TimeOut
-
-        if response is not None:
-            self._hub_config = self._hub_config._replace(
-                info=response)
-        return self._hub_config.info
-
     async def send_to_hub(self,
                           command: str,
                           params: dict = None,
@@ -350,13 +352,13 @@ class HarmonyClient:
 
         try:
             with timeout(DEFAULT_TIMEOUT):
-                if await self._hub_connection.send(
+                if await self._hub_connection.hub_send(
                         command='{}?{}'.format(
                             HUB_COMMANDS[command]['mime'],
                             HUB_COMMANDS[command]['command']
                         ),
                         params=params,
-                        msgid=msgid
+                        msgid=msgid,
                 ) is None:
                     # There was an issue
                     return False
@@ -444,6 +446,8 @@ class HarmonyClient:
                               current_hub_config_version)
                 self._hub_config = self._hub_config._replace(
                     config_version=current_hub_config_version)
+                self._hub_config = self._hub_config._replace(
+                    info=resp_data)
                 # Get all the HUB information.
                 await self.refresh_info_from_hub()
 
@@ -498,9 +502,6 @@ class HarmonyClient:
         params = {
             "async": "true",
             "timestamp": 0,
-            "args": {
-                "rule": "start"
-            },
             "activityId": str(activity_id)
         }
         msgid = str(uuid4())
@@ -590,6 +591,9 @@ class HarmonyClient:
         handler.handler_obj = startactivity_completed_callback
         register_activity_handler(activity_handler=handler)
 
+        _LOGGER.debug("%s: Handlers registered with ID %s",
+                      self.name,
+                      msgid)
         # Get the lock ensuring we're the only ones able to initiate
         async with self._snd_cmd_act_lck:
             response = await self.send_to_hub(command='start_activity',
@@ -644,10 +648,13 @@ class HarmonyClient:
                                               seconds=expiration)
                                           )
 
-                msgid = await self._send_command(command,
-                                                 command_handler)
-                if msgid is not None:
-                    msgid_dict.update({msgid: command})
+                msgid_press, msgid_release = await self._send_command(
+                    command,
+                    command_handler)
+                if msgid_press is not None:
+                    msgid_dict.update({msgid_press: command})
+                if msgid_release is not None:
+                    msgid_dict.update({msgid_release: command})
 
         # Go through the result list to determine there were any issues with
         # any of the commands sent. Only if there is an issue would a response
@@ -698,7 +705,8 @@ class HarmonyClient:
 
     async def _send_command(self,
                             command: SendCommandDevice,
-                            callback_handler: Handler) -> Optional[str]:
+                            callback_handler: Handler) ->\
+            Tuple[Optional[str], Optional[str]]:
         """Send a command to specified device
 
         :param command: Command to send to the device. (device, command, delay)
@@ -723,29 +731,33 @@ class HarmonyClient:
                       '"deviceId": "{}"}}'.format(command.command,
                                                   command.device)
         }
-        msgid = str(uuid4())
+        msgid_press = str(uuid4())
 
         # Register the handler for this command.
         self.register_handler(handler=callback_handler,
-                              msgid=msgid)
+                              msgid=msgid_press)
 
         # Send the command to the HUB
         response = await self.send_to_hub(command='send_command',
                                           params=params,
-                                          msgid=msgid,
+                                          msgid=msgid_press,
                                           wait=False)
         if not response:
             # There was an issue
-            return None
+            return None, None
 
         if command.delay > 0:
             await asyncio.sleep(command.delay)
 
         params['status'] = 'release'
+        msgid_release = str(uuid4())
+        # Register the handler for this command.
+        self.register_handler(handler=callback_handler,
+                              msgid=msgid_release)
         # Send the command to the HUB
         await self.send_to_hub(command='send_command',
                                params=params,
-                               msgid=msgid,
+                               msgid=msgid_release,
                                wait=False)
 
         _LOGGER.debug("%s: Sending command %s to device %s (%s) with delay "
@@ -755,7 +767,7 @@ class HarmonyClient:
                       self.get_device_name(command.device),
                       command.device,
                       command.delay)
-        return msgid
+        return msgid_press, msgid_release
 
     def get_activity_id(self, activity_name) -> Optional[int]:
         """Find the activity ID for the provided activity name."""

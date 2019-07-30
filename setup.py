@@ -27,6 +27,7 @@ VERSION = None
 REQUIRED = [  # type: ignore
     'aiohttp',
     'async-timeout',
+    'slixmpp',
 ]
 
 # The rest you shouldn't have to touch too much :)
