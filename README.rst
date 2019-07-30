@@ -123,7 +123,9 @@ Release Notes
     - Added debug log entry when connected to HUB.
 0.2.0. New:
     - Support for XMPP. If XMPP is enabled on Hub then that will be used, otherwise fallback to web sockets.
-      There are no changes to the API for this.
+      There are no changes to the API for this. XMPP has to be explicitly enabled on the Harmony HUB.
+      To do so open the Harmony app and go to: Menu > Harmony Setup > Add/Edit Devices & Activities > Remote & Hub > Enable XMPP
+      Same steps can be followed to disable XMPP again.
     - Log entries from responsehandler class will now include ip address of HUB for easier identification
 
 
