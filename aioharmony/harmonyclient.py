@@ -726,9 +726,9 @@ class HarmonyClient:
             "status": "press",
             "timestamp": '0',
             "verb": "render",
-            "action": '{{"command": "{}",'
-                      '"type": "IRCommand",'
-                      '"deviceId": "{}"}}'.format(command.command,
+            "action": '{{"command":: "{}",'
+                      '"type":: "IRCommand",'
+                      '"deviceId":: "{}"}}'.format(command.command,
                                                   command.device)
         }
         msgid_press = str(uuid4())
@@ -750,6 +750,7 @@ class HarmonyClient:
             await asyncio.sleep(command.delay)
 
         params['status'] = 'release'
+
         msgid_release = str(uuid4())
         # Register the handler for this command.
         self.register_handler(handler=callback_handler,
