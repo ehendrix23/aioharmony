@@ -123,6 +123,8 @@ Release Notes
 0.1.12. Fixed/Changed:
     - Fixed issue where connection debug messages would not be shown on failed reconnects.
     - Added debug log entry when connected to HUB.
+0.1.13. Fixed:
+    - Fixed further potential issue where on some OS's sockets would not be closed by now force clofing them.
 
 TODO
 ----

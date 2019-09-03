@@ -91,6 +91,8 @@ class HubConnector:
         conn = aiohttp.TCPConnector(
             family=socket.AF_INET,
             verify_ssl=False,
+            force_close=True,
+            enable_cleanup_closed=True,
         )
 
         session_timeout = aiohttp.ClientTimeout(connect=5)
