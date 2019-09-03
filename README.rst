@@ -127,7 +127,8 @@ Release Notes
       To do so open the Harmony app and go to: Menu > Harmony Setup > Add/Edit Devices & Activities > Remote & Hub > Enable XMPP
       Same steps can be followed to disable XMPP again.
     - Log entries from responsehandler class will now include ip address of HUB for easier identification
-
+0.2.1 Fixed:
+    - Fixed issue in sending commands to HUB wbe using XMPP protocol.
 
 
 TODO
