@@ -132,6 +132,7 @@ Release Notes
 0.2.1 Fixed:
     - Fixed issue in sending commands to HUB wbe using XMPP protocol.
 0.2.2 Fixed:
+    - Added closing code from aiohttp for web sockets in debug logging if closing code provided.
     - Fixed further potential issue where on some OS's sockets would not be closed by now force closing them (merge from 0.1.13)
     - Fixed listen parameter as it would just exit instead of continuously wait.
 
