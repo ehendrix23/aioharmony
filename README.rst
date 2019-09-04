@@ -133,6 +133,7 @@ Release Notes
     - Fixed issue in sending commands to HUB wbe using XMPP protocol.
 0.2.2 Fixed:
     - Fixed further potential issue where on some OS's sockets would not be closed by now force closing them (merge from 0.1.13)
+    - Fixed listen parameter as it would just exit instead of continuously wait.
 
 
 TODO
