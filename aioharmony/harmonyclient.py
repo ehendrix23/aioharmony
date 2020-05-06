@@ -451,6 +451,39 @@ class HarmonyClient:
                 # Get all the HUB information.
                 await self.refresh_info_from_hub()
 
+            # Change activity already during startup of activity
+            activityStatus = resp_data.get('activityStatus')
+            #0 - switched off
+            #1 - activity is startING
+            #2 - activity is startED
+            #3 - Harmony Hub is being switched off
+            if activityStatus == 1:
+                new_activity = None
+                if resp_data is not None:
+                    new_activity = int(resp_data.get('activityId'))
+
+                if new_activity is None:
+                    await self._get_current_activity()
+                    return
+
+                self._current_activity_id = new_activity
+                _LOGGER.debug("%s: New activity: %s(%s)",
+                              self.name,
+                              self.get_activity_name(self._current_activity_id),
+                              self._current_activity_id)
+
+                # If we were provided a callback handler then call it now.
+                if self._callbacks.new_activity:
+                    call_callback(
+                        callback_handler=self._callbacks.new_activity,
+                        result=(self._current_activity_id,
+                                self.get_activity_name(
+                                    self._current_activity_id)
+                                ),
+                        callback_uuid=self._ip_address,
+                        callback_name='new_activity_callback'
+                    )
+                    
     # pylint: disable=broad-except
     async def _update_activity_callback(self,
                                         message: dict = None) -> None:
