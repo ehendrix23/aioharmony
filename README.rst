@@ -121,6 +121,8 @@ Release Notes
 0.1.12. Fixed/Changed:
     - Fixed issue where connection debug messages would not be shown on failed reconnects.
     - Added debug log entry when connected to HUB.
+0.1.13.
+    - Fixed further potential issue where on some OS's sockets would not be closed by now force closing them.
 0.2.0. New:
     - Support for XMPP. If XMPP is enabled on Hub then that will be used, otherwise fallback to web sockets.
       There are no changes to the API for this. XMPP has to be explicitly enabled on the Harmony HUB.
@@ -129,7 +131,12 @@ Release Notes
     - Log entries from responsehandler class will now include ip address of HUB for easier identification
 0.2.1 Fixed:
     - Fixed issue in sending commands to HUB wbe using XMPP protocol.
-
+0.2.2 Fixed:
+    - Added closing code from aiohttp for web sockets in debug logging if closing code provided.
+    - Fixed further potential issue where on some OS's sockets would not be closed by now force closing them (merge from 0.1.13)
+    - Fixed listen parameter as it would just exit instead of continuously wait.
+0.2.3 Changed:
+    - Updated requirement for slixmpp to 1.5.2 as that version works with Home Assistant
 
 TODO
 ----

@@ -87,8 +87,9 @@ class HubConnector:
         # Specify socket
         conn = aiohttp.TCPConnector(
             family=socket.AF_INET,
-            enable_cleanup_closed=True,
             verify_ssl=False,
+            force_close=True,
+            enable_cleanup_closed=True,
         )
 
         session_timeout = aiohttp.ClientTimeout(connect=DEFAULT_TIMEOUT)
@@ -346,8 +347,10 @@ class HubConnector:
                               response.data)
 
                 if response.type == aiohttp.WSMsgType.CLOSED:
-                    _LOGGER.debug("%s: Web socket closed",
-                                  self._ip_address)
+                    close_code = '' if response.data is None else 'with code ' + \
+                                                                  aiohttp.WSCloseCode(response.data).name
+                    _LOGGER.debug("%s: Web socket closed %s",
+                                  self._ip_address, close_code)
                     # Issue reconnect event if enabled
                     have_connection = False
                     break
