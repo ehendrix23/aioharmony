@@ -135,7 +135,8 @@ Release Notes
     - Added closing code from aiohttp for web sockets in debug logging if closing code provided.
     - Fixed further potential issue where on some OS's sockets would not be closed by now force closing them (merge from 0.1.13)
     - Fixed listen parameter as it would just exit instead of continuously wait.
-
+0.2.3 Changed:
+    - Updated requirement for slixmpp to 1.5.2 as that version works with Home Assistant
 
 TODO
 ----
