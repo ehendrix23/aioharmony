@@ -56,7 +56,7 @@ class HarmonyClient:
             ClientCallbackType(None, None, None, None)
         self._loop = loop if loop else asyncio.get_event_loop()
 
-        self._hub_config = ClientConfigType({}, {}, None, [], [])
+        self._hub_config = ClientConfigType({}, {}, {}, {}, None, [], [])
         self._current_activity_id = None
         self._hub_connection = None
 
@@ -93,7 +93,7 @@ class HarmonyClient:
 
     @property
     def name(self) -> Optional[str]:
-        name = self._hub_config.info.get('friendlyName')
+        name = self._hub_config.discover_info.get('friendlyName')
         return name if name is not None else self._ip_address
 
     @property
@@ -195,10 +195,14 @@ class HarmonyClient:
                     self._hub_config = self._hub_config._replace(
                         config_version=resp_data.get('configVersion'))
                     self._hub_config = self._hub_config._replace(
-                        info=resp_data)
+                        hub_state=resp_data)
                     _LOGGER.debug("%s: HUB configuration version is: %s",
                                   self.name,
                                   self._hub_config.config_version)
+            else:
+                _LOGGER.debug("%s: HUB ID : %s",
+                              self.name,
+                              self._hub_config.info.get('activeRemoteId'))
 
         if self._hub_connection.callbacks.connect is None and \
                 self._callbacks.connect is not None:
@@ -215,6 +219,12 @@ class HarmonyClient:
                 self._callbacks.connect,
                 self._callbacks.disconnect
             )
+
+        _LOGGER.debug("%s: Connected to HUB on IP %s with ID %s.",
+                      self.name,
+                      self._ip_address,
+                      self._hub_config.info.get('activeRemoteId'))
+
         return True
 
     async def close(self) -> None:
@@ -255,12 +265,34 @@ class HarmonyClient:
         async with self._sync_lck:
             try:
                 # Retrieve configuration and HUB version config.
-                with timeout(DEFAULT_TIMEOUT):
-                    await self._get_config()
+                with timeout(DEFAULT_TIMEOUT*4):
+                    results = await asyncio.gather(
+                        self._get_config(),
+                        self._retrieve_hub_info(),
+                        return_exceptions=True
+                    )
             except asyncio.TimeoutError:
                 _LOGGER.error("%s: Timeout trying to retrieve configuraton.",
                               self.name)
                 raise aioexc.TimeOut
+
+            for idx, result in enumerate(results):
+                if isinstance(
+                        result,
+                        aioexc.TimeOut):
+                    # Timeout exception, just put out error then.
+                    if idx == 0:
+                        result_name = 'config'
+                    else:
+                        result_name = 'hub info'
+
+                    _LOGGER.error("%s: Timeout trying to retrieve %s.",
+                                  self.name,
+                                  result_name)
+                    return
+                elif isinstance(result, Exception):
+                    # Other exception, raise it.
+                    raise result
             try:
                 # Retrieve current activity, done only once config received.
                 with timeout(DEFAULT_TIMEOUT):
@@ -289,7 +321,16 @@ class HarmonyClient:
         _LOGGER.debug("%s: Getting configuration",
                       self.name)
         # Send the command to the HUB
-        response = await self.send_to_hub(command='get_config')
+        try:
+            with timeout(DEFAULT_TIMEOUT):
+                response = await self.send_to_hub(command='get_config', send_timeout=DEFAULT_TIMEOUT/2)
+        except (asyncio.TimeoutError, aioexc.TimeOut):
+            try:
+                with timeout(DEFAULT_TIMEOUT):
+                    response = await self.send_to_hub(command='get_config', send_timeout=DEFAULT_TIMEOUT/2)
+            except (asyncio.TimeoutError, aioexc.TimeOut):
+                raise aioexc.TimeOut
+
         if not response:
             # There was an issue
             return None
@@ -323,11 +364,66 @@ class HarmonyClient:
 
         return self._hub_config.config
 
+    async def _retrieve_hub_info(self) -> Optional[dict]:
+        """Retrieve some information from the Hub."""
+        # Send the command to the HUB
+
+        response = None
+        result = None
+        try:
+            with timeout(DEFAULT_TIMEOUT):
+                result = await self.send_to_hub(command='provision_info', post=True, send_timeout=DEFAULT_TIMEOUT/2)
+        except (asyncio.TimeoutError, aioexc.TimeOut):
+            try:
+                _LOGGER.debug("%s: Timeout trying to retrieve provisioning info, retrying.", self.name)
+                with timeout(DEFAULT_TIMEOUT):
+                    result = await self.send_to_hub(command='provision_info', post=True, send_timeout=DEFAULT_TIMEOUT/2)
+            except (asyncio.TimeoutError, aioexc.TimeOut):
+                _LOGGER.error("%s: Timeout trying to retrieve provisioning info.", self.name)
+
+        if result is not None:
+            if result.get('code') != 200 and result.get('code') != '200':
+                _LOGGER.error("%s: Incorrect status code %s received trying to "
+                              "get provisioning info for %s",
+                              self.name,
+                              result.get('code'),
+                              self._ip_address)
+            else:
+                self._hub_config = self._hub_config._replace(
+                    info=result.get('data'))
+                response = self._hub_config.info
+
+        try:
+            with timeout(DEFAULT_TIMEOUT):
+                result = await self.send_to_hub(command='discovery', post=False, send_timeout=DEFAULT_TIMEOUT/2)
+        except (asyncio.TimeoutError, aioexc.TimeOut):
+            try:
+                _LOGGER.debug("%s: Timeout trying to retrieve discovery info, retrying", self.name)
+                with timeout(DEFAULT_TIMEOUT):
+                    result = await self.send_to_hub(command='discovery', post=False, send_timeout=DEFAULT_TIMEOUT/2)
+            except (asyncio.TimeoutError, aioexc.TimeOut):
+                _LOGGER.error("%s: Timeout trying to retrieve discovery info.", self.name)
+
+        if result is not None:
+            if result.get('code') != 200 and result.get('code') != '200':
+                _LOGGER.error("%s: Incorrect status code %s received trying to "
+                              "get provisioning info for %s",
+                              self.name,
+                              result.get('code'),
+                              self._ip_address)
+            else:
+                self._hub_config = self._hub_config._replace(
+                    discover_info=result.get('data'))
+
+        return response
+
     async def send_to_hub(self,
                           command: str,
                           params: dict = None,
                           msgid: str = None,
-                          wait: bool = True) -> Union[dict, bool]:
+                          wait: bool = True,
+                          post: bool = False,
+                          send_timeout: int = DEFAULT_TIMEOUT) -> Union[dict, bool]:
 
         if msgid is None:
             msgid = str(uuid4())
@@ -351,26 +447,30 @@ class HarmonyClient:
                                   msgid=msgid)
 
         try:
-            with timeout(DEFAULT_TIMEOUT):
-                if await self._hub_connection.hub_send(
+            with timeout(send_timeout):
+                send_response = await self._hub_connection.hub_send(
                         command='{}?{}'.format(
                             HUB_COMMANDS[command]['mime'],
                             HUB_COMMANDS[command]['command']
                         ),
                         params=params,
                         msgid=msgid,
-                ) is None:
+                        post=post,
+                )
+                if send_response is None:
                     # There was an issue
                     return False
         except asyncio.TimeoutError:
             raise aioexc.TimeOut
 
-        if not wait:
+        if asyncio.isfuture(send_response):
+            response = send_response
+        elif not wait:
             return True
 
         # Wait for the response to be available.
         try:
-            with timeout(DEFAULT_TIMEOUT):
+            with timeout(send_timeout):
                 await response
         except asyncio.TimeoutError:
             raise aioexc.TimeOut
@@ -382,12 +482,20 @@ class HarmonyClient:
         _LOGGER.debug("%s: Retrieving current activity", self.name)
 
         # Send the command to the HUB
+
         try:
-            response = await self.send_to_hub(command='get_current_activity')
-        except aioexc.TimeOut:
-            _LOGGER.error("%s: Timeout trying to retrieve current activity.",
+            with timeout(DEFAULT_TIMEOUT):
+                response = await self.send_to_hub(command='get_current_activity', send_timeout=DEFAULT_TIMEOUT/2)
+        except (asyncio.TimeoutError, aioexc.TimeOut):
+            _LOGGER.debug("%s: Timeout trying to retrieve current activity, retrying.",
                           self.name)
-            response = None
+            try:
+                with timeout(DEFAULT_TIMEOUT):
+                    response = await self.send_to_hub(command='get_current_activity', send_timeout=DEFAULT_TIMEOUT/2)
+            except (asyncio.TimeoutError, aioexc.TimeOut):
+                _LOGGER.error("%s: Timeout trying to retrieve current activity.",
+                          self.name)
+                response = None
 
         if not response:
             # There was an issue
@@ -446,8 +554,6 @@ class HarmonyClient:
                               current_hub_config_version)
                 self._hub_config = self._hub_config._replace(
                     config_version=current_hub_config_version)
-                self._hub_config = self._hub_config._replace(
-                    info=resp_data)
                 # Get all the HUB information.
                 await self.refresh_info_from_hub()
 

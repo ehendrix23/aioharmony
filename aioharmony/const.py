@@ -47,7 +47,15 @@ HUB_COMMANDS = {
     'sync': {
         'mime': 'setup.sync',
         'command': None
-    }
+    },
+    'provision_info': {
+        'mime': 'setup.account',
+        'command': 'getProvisionInfo'
+    },
+    'discovery': {
+        'mime': 'connect.discoveryinfo',
+        'command': 'get'
+    },
 }
 
 #
@@ -69,6 +77,8 @@ ConnectorCallbackType = NamedTuple('ConnectorCallbackType',
 ClientConfigType = NamedTuple('ClientConfigType',
                               [('config', dict),
                                ('info', dict),
+                               ('discover_info', dict),
+                               ('hub_state', dict),
                                ('config_version', Optional[int]),
                                ('activities', List[dict]),
                                ('devices', List[dict])

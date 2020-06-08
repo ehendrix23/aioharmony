@@ -137,6 +137,12 @@ Release Notes
     - Fixed listen parameter as it would just exit instead of continuously wait.
 0.2.3 Changed:
     - Updated requirement for slixmpp to 1.5.2 as that version works with Home Assistant
+0.2.4 Fixed:
+    - Friendly Name of Harmony HUB was not retrieved anymore, this is now available again
+    - Remote ID was not retrieved anymore, this is now available again
+    - If HUB disconnects when retrieving information then retrieval will be retried.
+    - Executing aioharmony with option show_detailed_config will now show all config retrieved from HUB
+
 
 TODO
 ----

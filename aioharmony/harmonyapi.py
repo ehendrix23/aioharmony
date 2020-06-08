@@ -70,7 +70,11 @@ class HarmonyAPI:
 
     @property
     def fw_version(self) -> Optional[str]:
-        return self.hub_config.info.get('hubSwVersion')
+        return self.hub_config.hub_state.get('hubSwVersion')
+
+    @property
+    def hub_id(self) -> Optional[str]:
+        return self.hub_config.info.get('activeRemoteId')
 
     @property
     def current_activity(self) -> tuple:

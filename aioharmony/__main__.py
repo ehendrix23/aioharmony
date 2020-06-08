@@ -34,9 +34,10 @@ async def get_client(ip_address, show_responses) -> Optional[HarmonyAPI]:
         client.register_handler(handler=listen_callback)
 
     if await client.connect():
-        print("Connected to HUB {} with firmware version {}".format(
+        print("Connected to HUB {} with firmware version {} and ID {}".format(
             client.name,
-            client.fw_version))
+            client.fw_version,
+            client.hub_id))
         return client
 
     print("An issue occured trying to connect")
@@ -68,10 +69,10 @@ async def show_config(client, _):
 async def show_detailed_config(client, _):
     """Connects to the Harmony and return current configuration.
     """
-    config = client.config
+    config = client.hub_config
 
     if config:
-        print(json.dumps(config, sort_keys=True, indent=4,
+        print(json.dumps(client.hub_config, sort_keys=True, indent=4,
                          separators=(',', ': ')))
     else:
         print("There was a problem retrieving the configuration")

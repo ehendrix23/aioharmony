@@ -57,6 +57,7 @@ class HubConnector(slixmpp.ClientXMPP):
         self._connect_disconnect_lock = asyncio.Lock()
 
         self._listener_task = None
+        self._listener_message_received = None
 
         self._connected = False
 
@@ -129,11 +130,13 @@ class HubConnector(slixmpp.ClientXMPP):
             connected = loop.create_future()
 
             def connection_success(_):
+                self.del_event_handler('connection_failed', connection_failed)
                 connected.set_result(True)
 
             def connection_failed(event):
                 connected.set_exception(event)
                 self.cancel_connection_attempt()
+                self.del_event_handler('connected', connection_success)
                 # Doing below as for some reason cancel does not really
                 # cancel it. This will result in exception and it
                 # stopping.
@@ -205,6 +208,13 @@ class HubConnector(slixmpp.ClientXMPP):
             def disconnect_result(_):
                 disconnected.set_result(True)
 
+            self.del_event_handler('connected',
+                                   self._connected_handler)
+            self.del_event_handler('disconnected',
+                                   self._disconnected_handler)
+
+            self.remove_handler('listener')
+
             self.add_event_handler('disconnected',
                                    disconnect_result,
                                    disposable=True,
@@ -270,7 +280,8 @@ class HubConnector(slixmpp.ClientXMPP):
                        command,
                        iq_type='get',
                        params=None,
-                       msgid=None) -> \
+                       msgid=None,
+                       post=False) -> \
             Optional[str]:
         """Send a payload request to Harmony Hub and return json response."""
         # Make sure we're connected.
@@ -365,6 +376,8 @@ class HubConnector(slixmpp.ClientXMPP):
             # Put response on queue.
             self._response_queue.put_nowait(response)
 
+        self._listener_message_received = message_received
+
         # Register our callback.
         self.register_handler(
             Callback('Listener',
@@ -378,7 +391,3 @@ class HubConnector(slixmpp.ClientXMPP):
                          self.default_ns,
                          DEFAULT_NS)),
                      message_received))
-
-    async def retrieve_hub_info(self) -> Optional[dict]:
-        """ To retrieve HUB info, not used for XMPP. """
-        pass
