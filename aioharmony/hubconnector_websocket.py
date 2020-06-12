@@ -8,7 +8,7 @@ import asyncio
 import logging
 import socket
 from contextlib import suppress
-from typing import Optional
+from typing import Optional, Union
 from urllib.parse import urlparse
 from uuid import uuid4
 
@@ -102,7 +102,7 @@ class HubConnector:
 
         if self._remote_id is None:
             # We do not have the remoteId yet, get it first.
-            response = await self.retrieve_hub_info()
+            response = await self._retrieve_hub_info()
             if response is not None:
                 self._remote_id = response.get('activeRemoteId')
                 domain = urlparse(response.get('discoveryServer'))
@@ -172,8 +172,6 @@ class HubConnector:
                 self._websocket = None
                 return False
 
-            _LOGGER.debug("%s: Connected to hub %s", self._ip_address,
-                          self._remote_id)
             # Now put the listener on the loop.
             if not self._listener_task:
                 self._listener_task = asyncio.ensure_future(
@@ -187,7 +185,8 @@ class HubConnector:
                           callback_uuid=self._ip_address,
                           callback_name='connected'
                           )
-            _LOGGER.debug("%s: Connected to hub", self._ip_address)
+            _LOGGER.debug("%s: Connected to hub %s", self._ip_address,
+                          self._remote_id)
             return True
 
     async def hub_disconnect(self) -> None:
@@ -266,15 +265,32 @@ class HubConnector:
             sleep_time = min(sleep_time, 30)
             is_reconnect = True
 
-    async def hub_send(self, command, params, msgid=None) -> \
-            Optional[str]:
+    async def hub_send(self, command, params, msgid=None, post=False) -> \
+            Optional[Union[str, dict]]:
         """Send a payload request to Harmony Hub and return json response."""
-        # Make sure we're connected.
-        if not await self.hub_connect():
-            return
 
         if not msgid:
             msgid = str(uuid4())
+
+        if post:
+            url = 'http://{}:{}/'.format(self._ip_address, DEFAULT_HUB_PORT)
+            headers = {
+                'Origin': 'http://sl.dhg.myharmony.com',
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Accept-Charset': 'utf-8',
+            }
+            json_request = {
+                "id ": msgid,
+                "cmd": command,
+                "params": {}
+            }
+            response = asyncio.ensure_future(self.hub_post(url, json_request, headers))
+            return response
+
+        # Make sure we're connected.
+        if not await self.hub_connect():
+            return
 
         payload = {
             "hubId": self._remote_id,
@@ -389,10 +405,12 @@ class HubConnector:
         if not have_connection:
             await self._reconnect()
 
-    async def retrieve_hub_info(self) -> Optional[dict]:
+    async def _retrieve_hub_info(self) -> Optional[dict]:
         """Retrieve the harmony Hub information."""
         _LOGGER.debug("%s: Retrieving Harmony Hub information.",
                       self._ip_address)
+
+
         url = 'http://{}:{}/'.format(self._ip_address, DEFAULT_HUB_PORT)
         headers = {
             'Origin': 'http://sl.dhg.myharmony.com',

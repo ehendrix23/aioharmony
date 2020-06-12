@@ -47,7 +47,15 @@ HUB_COMMANDS = {
     'sync': {
         'mime': 'setup.sync',
         'command': None
-    }
+    },
+    'provision_info': {
+        'mime': 'setup.account',
+        'command': 'getProvisionInfo'
+    },
+    'discovery': {
+        'mime': 'connect.discoveryinfo',
+        'command': 'get'
+    },
 }
 
 #
@@ -61,6 +69,14 @@ CallbackType = Union[
     Callable[[object, Optional[Any]], Any]
 ]
 
+ClientCallbackType = NamedTuple('ClientCallbackType',
+                                [('connect', Optional[CallbackType]),
+                                 ('disconnect', Optional[CallbackType]),
+                                 ('new_activity_starting', Optional[CallbackType]),
+                                 ('new_activity', Optional[CallbackType]),
+                                 ('config_updated', Optional[CallbackType])
+                                 ])
+
 ConnectorCallbackType = NamedTuple('ConnectorCallbackType',
                                    [('connect', Optional[CallbackType]),
                                     ('disconnect', Optional[CallbackType])
@@ -69,6 +85,8 @@ ConnectorCallbackType = NamedTuple('ConnectorCallbackType',
 ClientConfigType = NamedTuple('ClientConfigType',
                               [('config', dict),
                                ('info', dict),
+                               ('discover_info', dict),
+                               ('hub_state', dict),
                                ('config_version', Optional[int]),
                                ('activities', List[dict]),
                                ('devices', List[dict])
