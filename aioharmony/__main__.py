@@ -430,29 +430,28 @@ async def run():
 
         await asyncio.wait_for(asyncio.gather(*hub_tasks), timeout=10)
 
+def cancel_tasks(loop):
+
+    print(f"There are {len(asyncio.all_tasks(loop))} task(s) still running.")
+    for task in asyncio.all_tasks(loop):
+        task.cancel()
+
+    # Allow cancellations to be processed
+    for x in range(10):
+        loop.run_until_complete(asyncio.sleep(1))
+        if len(asyncio.all_tasks(loop)) == 0:
+            break
+
 def main() -> None:
     loop = asyncio.new_event_loop()
     try:
         loop.run_until_complete(run())
-        # Cancel out any open tasks.
-        for task in asyncio.all_tasks(loop):
-            task.cancel()
-
-        # Allow cancellations to be processed
-        loop.run_until_complete(asyncio.sleep(1))
+        cancel_tasks(loop)
         loop.close()
 
     except KeyboardInterrupt:
         print("Exit requested.")
-        # Cancel out any open tasks.
-        for task in asyncio.all_tasks(loop):
-            task.cancel()
-
-        # Allow cancellations to be processed
-        for x in range(10):
-            loop.run_until_complete(asyncio.sleep(1))
-            if len(asyncio.all_tasks(loop)) == 0:
-                break
+        cancel_tasks(loop)
         loop.close()
         print("Closed.")
 
