@@ -53,6 +53,10 @@ class HarmonyAPI:
         return self._harmony_client.ip_address
 
     @property
+    def protocol(self) -> str:
+        return self._harmony_client.protocol
+
+    @property
     def hub_config(self) -> ClientConfigType:
         return self._harmony_client.hub_config
 
@@ -70,7 +74,11 @@ class HarmonyAPI:
 
     @property
     def fw_version(self) -> Optional[str]:
-        return self.hub_config.info.get('hubSwVersion')
+        return self.hub_config.hub_state.get('hubSwVersion')
+
+    @property
+    def hub_id(self) -> Optional[str]:
+        return self.hub_config.info.get('activeRemoteId')
 
     @property
     def current_activity(self) -> tuple:

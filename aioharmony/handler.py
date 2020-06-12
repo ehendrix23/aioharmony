@@ -218,6 +218,42 @@ HANDLER_START_ACTIVITY_NOTIFY_INPROGRESS = Handler(
     once=False
 )
 
+HANDLER_START_ACTIVITY_NOTIFY_STARTED = Handler(
+    handler_obj=dummy_callback,
+    handler_name='Activity_Starting',
+    resp_json={
+        'type': re.compile(r'^connect\.stateDigest\?notify$'),
+        'data': {
+            'activityStatus': 1,
+        },
+    },
+    once=False
+)
+
+HANDLER_STOP_ACTIVITY_NOTIFY_STARTED = Handler(
+    handler_obj=dummy_callback,
+    handler_name='Activity_Stopping',
+    resp_json={
+        'type': re.compile(r'^connect\.stateDigest\?notify$'),
+        'data': {
+            'activityStatus': 0,
+        },
+    },
+    once=False
+)
+
+HANDLER_START_ACTIVITY_NOTIFY_INPROGRESS = Handler(
+    handler_obj=dummy_callback,
+    handler_name='Activity_Starting_Inprogress',
+    resp_json={
+        'type': re.compile(r'^connect\.stateDigest\?notify$'),
+        'data': {
+            'activityStatus': 2,
+        },
+    },
+    once=False
+)
+
 HANDLER_START_ACTIVITY_FINISHED = Handler(
     handler_obj=dummy_callback,
     handler_name='Activity_Changed',

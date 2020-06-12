@@ -137,6 +137,25 @@ Release Notes
     - Fixed listen parameter as it would just exit instead of continuously wait.
 0.2.3 Changed:
     - Updated requirement for slixmpp to 1.5.2 as that version works with Home Assistant
+0.2.4 Fixed:
+    - Friendly Name of Harmony HUB was not retrieved anymore, this is now available again
+    - Remote ID was not retrieved anymore, this is now available again
+    - If HUB disconnects when retrieving information then retrieval will be retried.
+    - Executing aioharmony with option show_detailed_config will now show all config retrieved from HUB
+0.2.5
+    - Fixed: When using XMPP protocol the switching of an activity was not always discovered.
+    - Changed: ClientCallbackType is now in aioharmony.const instead of aioharmony.harmonyclient.
+    - Changed: default log level for aioharmony main is now ERROR
+    - New: callback option new_activity_starting to allow a callback when a new activity is being started (new_activity is called when switching activity is completed)
+    - New: 3 new HANDLER types have been added:
+        - HANDLER_START_ACTIVITY_NOTIFY_STARTED: activity is being started
+        - HANDLER_STOP_ACTIVITY_NOTIFY_STARTED: power off is started
+        - HANDLER_START_ACTIVITY_NOTIRY_INPROGRESS: activity switch is in progress
+    - New: protocol used to connect can now be retrieved. It will return WEBSOCKETS when connected over web sockets or XMPP.
+    - New: One can now supply multiple IP addresses for Harmony HUBs when using aioharmony main.
+    - New: option activity_monitor for aioharmony main to allow just monitoring of activity changes
+
+
 
 TODO
 ----
