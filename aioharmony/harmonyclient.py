@@ -130,23 +130,28 @@ class HarmonyClient:
     async def _websocket_or_xmpp(self) -> bool:
         """ Determine if XMPP is enabled, if not fall-back to web sockets.
         """
-        if self._protocol is None:
+        if not self._protocol == WEBSOCKETS :
             try:
                 _, _ = await asyncio.open_connection(host=self._ip_address,
                                                      port=DEFAULT_XMPP_HUB_PORT,
                                                      loop=self._loop
                                                      )
             except ConnectionRefusedError:
-                _LOGGER.warning("%s: XMPP is not enabled, using web sockets "
-                                "however this might not work with future Harmony "
-                                "firmware updates, please enable XMPP",
-                                self.name)
+                if self._protocol == XMPP:
+                    _LOGGER.warning("%s: XMPP is not enabled on this HUB, will be defaulting back to WEBSOCKETS.",
+                                    self.name)
+                else:
+                    _LOGGER.warning("%s: XMPP is not enabled, using web sockets "
+                                    "however this might not work with future Harmony "
+                                    "firmware updates, please enable XMPP",
+                                    self.name)
                 self._protocol = WEBSOCKETS
             except OSError as exc:
                 _LOGGER.error("%s: Unable to determine if XMPP is enabled: %s",
                               self.name,
                               exc)
-                return False
+                if self._protocol is None:
+                    return False
             else:
                 _LOGGER.debug("%s: XMPP is enabled", self.name)
                 self._protocol = XMPP
