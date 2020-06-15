@@ -7,6 +7,7 @@ import argparse
 import asyncio
 import json
 import logging
+import re
 import sys
 from typing import Optional
 
@@ -20,6 +21,18 @@ from aioharmony.const import ClientCallbackType, WEBSOCKETS, XMPP
 
 hub_client = None
 
+_ROOTLOGGER = logging.getLogger()
+_LOGGER = logging.getLogger(__name__)
+
+class LoggingFilter(logging.Filter):
+    def __init__(self, modules):
+        self._modules = modules
+
+    def filter(self, record):
+        for module in self._modules:
+            if record.name == module or re.search(module, record.name) is not None:
+                return True
+        return False
 
 async def get_client(ip_address, protocol, show_responses) -> Optional[HarmonyAPI]:
     client = HarmonyAPI(ip_address=ip_address, protocol=protocol)
@@ -264,6 +277,7 @@ async def execute_per_hub(hub, args):
 
     # Connect to the HUB
     try:
+        _LOGGER.debug("%s: Connecting to HUB", hub)
         hub_client = await get_client(hub,
                                       args.protocol,
                                       args.show_responses)
@@ -279,6 +293,7 @@ async def execute_per_hub(hub, args):
 
     # Execute provided request.
     if coroutine is not None:
+        _LOGGER.debug("%s: Executing function.", hub)
         try:
             await coroutine
         except aioharmony.exceptions.TimeOut:
@@ -286,14 +301,21 @@ async def execute_per_hub(hub, args):
 
     # Now sleep for provided time.
     if args.wait >= 0:
+        _LOGGER.debug("%s: Waiting for %s seconds.", hub, args.wait)
         await asyncio.sleep(args.wait)
     else:
+        _LOGGER.debug("%s: Waiting till cancelled", hub)
         while True:
             await asyncio.sleep(60)
 
     if hub_client:
-        await asyncio.wait_for(hub_client.close(), timeout=10)
+        _LOGGER.debug("%s: Closing connection to HUB.", hub)
+        try:
+            await asyncio.wait_for(hub_client.close(), timeout=60)
+        except aioharmony.exceptions.TimeOut:
+            _LOGGER.debug("%s: Timeout trying to close connection to HUB.", hub)
 
+    _LOGGER.debug("%s: All done with HUB.", hub)
 async def run():
     """Main method for the script."""
     global hub_client
@@ -325,6 +347,11 @@ async def run():
                         choices=list(loglevels.keys()),
                         help='Logging level for all components to '
                              'print to the console.')
+    parser.add_argument('--logmodules',
+                        required=False,
+                        type=str,
+                        help='Restrict logging to modules specified. Multiple can be provided as a '
+                             'comma separated list without any spaces. Use * to include any further submodules.')
 
     show_responses_parser = parser.add_mutually_exclusive_group(
         required=False)
@@ -415,9 +442,16 @@ async def run():
 
     args = parser.parse_args()
 
-    logging.basicConfig(
-        level=loglevels[args.loglevel],
-        format='%(asctime)s:%(levelname)s:\t%(name)s\t%(message)s')
+    log_formatter = logging.Formatter('%(asctime)s:%(levelname)s:\t%(name)s\t%(message)s')
+    log_stream = logging.StreamHandler()
+    log_stream.setFormatter(log_formatter)
+    _ROOTLOGGER.setLevel(loglevels[args.loglevel])
+    _ROOTLOGGER.addHandler(log_stream)
+
+    if hasattr(args, 'logmodules'):
+        log_modules = args.logmodules.split(",")
+        log_filter = LoggingFilter(log_modules)
+        log_stream.addFilter(log_filter)
 
     if args.wait < 0 and args.wait != -1:
         print("Invalid value provided for --wait.")
@@ -438,7 +472,7 @@ async def run():
             # Connect to the HUB
             hub_tasks.append(asyncio.ensure_future(execute_per_hub(hub, args)))
 
-        results = await asyncio.gather(*hub_tasks)
+        results = await asyncio.gather(*hub_tasks, return_exceptions=True)
         for idx, result in enumerate(results):
             if isinstance(
                     result,
@@ -448,6 +482,8 @@ async def run():
 
 def cancel_tasks(loop):
 
+    _LOGGER.debug("Cancelling any tasks still running.")
+    loop.run_until_complete(asyncio.sleep(1))
     for task in asyncio.all_tasks(loop):
         task.cancel()
 

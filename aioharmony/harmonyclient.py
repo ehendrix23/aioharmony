@@ -256,12 +256,17 @@ class HarmonyClient:
            This should be called to ensure everything is stopped and
            cancelled out.
         """
+        raise_exception = None
         if self._hub_connection:
             try:
                 with timeout(DEFAULT_TIMEOUT):
                     await self._hub_connection.close()
-            except asyncio.TimeoutError:
-                raise aioexc.TimeOut
+            except Exception as e:
+                _LOGGER.debug("%s: Exception occurred during disconnection.",
+                              self.name)
+                raise_exception = e
+                if isinstance(raise_exception, asyncio.TimeoutError):
+                    raise_exception = aioexc.TimeOut
 
         if self._callback_handler:
             try:
@@ -269,6 +274,10 @@ class HarmonyClient:
                     await self._callback_handler.close()
             except asyncio.TimeoutError:
                 raise aioexc.TimeOut
+
+        if raise_exception is not None:
+            raise raise_exception
+
 
     async def disconnect(self) -> None:
         """Disconnect from Hub"""
@@ -346,12 +355,12 @@ class HarmonyClient:
                       self.name)
         # Send the command to the HUB
         try:
-            with timeout(DEFAULT_TIMEOUT):
-                response = await self.send_to_hub(command='get_config', send_timeout=DEFAULT_TIMEOUT/2)
+            with timeout(DEFAULT_TIMEOUT/2):
+                response = await self.send_to_hub(command='get_config', send_timeout=DEFAULT_TIMEOUT/4)
         except (asyncio.TimeoutError, aioexc.TimeOut):
             try:
-                with timeout(DEFAULT_TIMEOUT):
-                    response = await self.send_to_hub(command='get_config', send_timeout=DEFAULT_TIMEOUT/2)
+                with timeout(DEFAULT_TIMEOUT/2):
+                    response = await self.send_to_hub(command='get_config', send_timeout=DEFAULT_TIMEOUT/4)
             except (asyncio.TimeoutError, aioexc.TimeOut):
                 raise aioexc.TimeOut
 
@@ -388,20 +397,18 @@ class HarmonyClient:
 
         return self._hub_config.config
 
-    async def _retrieve_hub_info(self) -> Optional[dict]:
-        """Retrieve some information from the Hub."""
-        # Send the command to the HUB
+    async def _retrieve_provision_info(self) -> Optional[dict]:
 
         response = None
         result = None
         try:
-            with timeout(DEFAULT_TIMEOUT):
-                result = await self.send_to_hub(command='provision_info', post=True, send_timeout=DEFAULT_TIMEOUT/2)
+            with timeout(DEFAULT_TIMEOUT/2):
+                result = await self.send_to_hub(command='provision_info', post=True, send_timeout=DEFAULT_TIMEOUT/4)
         except (asyncio.TimeoutError, aioexc.TimeOut):
             try:
                 _LOGGER.debug("%s: Timeout trying to retrieve provisioning info, retrying.", self.name)
-                with timeout(DEFAULT_TIMEOUT):
-                    result = await self.send_to_hub(command='provision_info', post=True, send_timeout=DEFAULT_TIMEOUT/2)
+                with timeout(DEFAULT_TIMEOUT/2):
+                    result = await self.send_to_hub(command='provision_info', post=True, send_timeout=DEFAULT_TIMEOUT/4)
             except (asyncio.TimeoutError, aioexc.TimeOut):
                 _LOGGER.error("%s: Timeout trying to retrieve provisioning info.", self.name)
 
@@ -417,14 +424,19 @@ class HarmonyClient:
                     info=result.get('data'))
                 response = self._hub_config.info
 
+        return response
+
+    async def _retrieve_discovery_info(self) -> None:
+
+        result = None
         try:
-            with timeout(DEFAULT_TIMEOUT):
-                result = await self.send_to_hub(command='discovery', post=False, send_timeout=DEFAULT_TIMEOUT/2)
+            with timeout(DEFAULT_TIMEOUT/2):
+                result = await self.send_to_hub(command='discovery', post=False, send_timeout=DEFAULT_TIMEOUT/4)
         except (asyncio.TimeoutError, aioexc.TimeOut):
             try:
                 _LOGGER.debug("%s: Timeout trying to retrieve discovery info, retrying", self.name)
-                with timeout(DEFAULT_TIMEOUT):
-                    result = await self.send_to_hub(command='discovery', post=False, send_timeout=DEFAULT_TIMEOUT/2)
+                with timeout(DEFAULT_TIMEOUT/2):
+                    result = await self.send_to_hub(command='discovery', post=False, send_timeout=DEFAULT_TIMEOUT/4)
             except (asyncio.TimeoutError, aioexc.TimeOut):
                 _LOGGER.error("%s: Timeout trying to retrieve discovery info.", self.name)
 
@@ -438,6 +450,24 @@ class HarmonyClient:
             else:
                 self._hub_config = self._hub_config._replace(
                     discover_info=result.get('data'))
+
+    async def _retrieve_hub_info(self) -> Optional[dict]:
+        """Retrieve some information from the Hub."""
+        # Send the command to the HUB
+
+        response = None
+
+        results = await asyncio.gather(
+            self._retrieve_provision_info(),
+            self._retrieve_discovery_info(),
+            return_exceptions=True
+        )
+        for idx, result in enumerate(results):
+            if isinstance(result, Exception):
+                raise result
+
+            if idx == 0:
+                response = result
 
         return response
 
@@ -508,14 +538,14 @@ class HarmonyClient:
         # Send the command to the HUB
 
         try:
-            with timeout(DEFAULT_TIMEOUT):
-                response = await self.send_to_hub(command='get_current_activity', send_timeout=DEFAULT_TIMEOUT/2)
+            with timeout(DEFAULT_TIMEOUT/2):
+                response = await self.send_to_hub(command='get_current_activity', send_timeout=DEFAULT_TIMEOUT/4)
         except (asyncio.TimeoutError, aioexc.TimeOut):
             _LOGGER.debug("%s: Timeout trying to retrieve current activity, retrying.",
                           self.name)
             try:
-                with timeout(DEFAULT_TIMEOUT):
-                    response = await self.send_to_hub(command='get_current_activity', send_timeout=DEFAULT_TIMEOUT/2)
+                with timeout(DEFAULT_TIMEOUT/2):
+                    response = await self.send_to_hub(command='get_current_activity', send_timeout=DEFAULT_TIMEOUT/4)
             except (asyncio.TimeoutError, aioexc.TimeOut):
                 _LOGGER.error("%s: Timeout trying to retrieve current activity.",
                           self.name)
