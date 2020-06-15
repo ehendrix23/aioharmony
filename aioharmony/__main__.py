@@ -13,7 +13,7 @@ from typing import Optional
 import aioharmony.exceptions
 from aioharmony.harmonyapi import HarmonyAPI, SendCommandDevice
 from aioharmony.responsehandler import Handler
-from aioharmony.const import ClientCallbackType
+from aioharmony.const import ClientCallbackType, WEBSOCKETS, XMPP
 
 # TODO: Add docstyle comments
 # TODO: Clean up code styling
@@ -21,41 +21,55 @@ from aioharmony.const import ClientCallbackType
 hub_client = None
 
 
-async def get_client(ip_address, show_responses) -> Optional[HarmonyAPI]:
-    client = HarmonyAPI(ip_address)
+async def get_client(ip_address, protocol, show_responses) -> Optional[HarmonyAPI]:
+    client = HarmonyAPI(ip_address=ip_address, protocol=protocol)
 
     def output_response(message):
-        print(message)
+        print(f"{client.name}: {message}")
 
-    listen_callback = Handler(handler_obj=output_response,
-                              handler_name='output_response',
-                              once=False
-                              )
     if show_responses:
+        listen_callback = Handler(handler_obj=output_response,
+                                  handler_name='output_response',
+                                  once=False
+                                  )
         client.register_handler(handler=listen_callback)
+
     print(f"Trying to connect to HUB with IP {ip_address}.")
-    if await client.connect():
-        print("Connected to HUB {} ({}) with firmware version {} and HUB ID {} using protocol {}".format(
-            client.name,
-            ip_address,
-            client.fw_version,
-            client.hub_id,
-            client.protocol))
-        return client
+    try:
+        if await client.connect():
+            print("Connected to HUB {} ({}) with firmware version {} and HUB ID {} using protocol {}".format(
+                client.name,
+                ip_address,
+                client.fw_version,
+                client.hub_id,
+                client.protocol))
+            return client
+    except ConnectionRefusedError:
+        print(f"Failed to connect to HUB {ip_address}.")
 
     print("An issue occurred trying to connect")
 
     return None
 
 
-async def just_listen(client, _):
+async def just_listen(client, args):
     # Create handler to output everything.
+    def output_response(message):
+        print(f"{client.name}: {message}")
+
     print("Starting to listen on HUB {} with firmware version {}".format(
         client.name,
         client.fw_version))
 
-    while True:
-        await asyncio.sleep(60)
+    # Register callback to show messages if not already done.
+    if not args.show_responses:
+        listen_callback = Handler(handler_obj=output_response,
+                                  handler_name='output_response',
+                                  once=False
+                                  )
+        client.register_handler(handler=listen_callback)
+
+    return
 
 async def listen_for_new_activities(client, _):
 
@@ -246,6 +260,39 @@ async def sync(client, _):
     else:
         print(f"HUB: {client.name} Sync failed")
 
+async def execute_per_hub(hub, args):
+
+    # Connect to the HUB
+    try:
+        hub_client = await get_client(hub,
+                                      args.protocol,
+                                      args.show_responses)
+        if hub_client is None:
+            return
+    except aioharmony.exceptions.TimeOut:
+        print("Action did not complete within a reasonable time.")
+        return
+
+    coroutine = None
+    if hasattr(args, 'func'):
+        coroutine = args.func(hub_client, args)
+
+    # Execute provided request.
+    if coroutine is not None:
+        try:
+            await coroutine
+        except aioharmony.exceptions.TimeOut:
+            print("Action did not complete within a reasonable time.")
+
+    # Now sleep for provided time.
+    if args.wait >= 0:
+        await asyncio.sleep(args.wait)
+    else:
+        while True:
+            await asyncio.sleep(60)
+
+    if hub_client:
+        await asyncio.wait_for(hub_client.close(), timeout=10)
 
 async def run():
     """Main method for the script."""
@@ -268,12 +315,11 @@ async def run():
     # Flags with default values go here.
     loglevels = dict((logging.getLevelName(level), level)
                      for level in [10, 20, 30, 40, 50])
-    parser.add_argument('--harmony_port',
+    parser.add_argument('--protocol',
                         required=False,
-                        default=5222,
-                        type=int,
-                        help=('Network port that the Harmony is listening'
-                              ' on.'))
+                        choices=[WEBSOCKETS,XMPP],
+                        help=('Protocol to use to connect to HUB. Note for XMPP one has to ensure that XMPP is enabled'
+                              'on the hub.'))
     parser.add_argument('--loglevel',
                         default='ERROR',
                         choices=list(loglevels.keys()),
@@ -332,7 +378,7 @@ async def run():
     sync_parser.set_defaults(func=sync)
 
     listen_parser = subparsers.add_parser('listen', help='Output everything '
-                                                         'HUB sends out')
+                                                         'HUB sends out. Use in combination with --wait.')
     listen_parser.set_defaults(func=just_listen)
 
     new_activity_parser = subparsers.add_parser(
@@ -383,56 +429,25 @@ async def run():
         pass
     else:
         if not hasattr(args, 'func') and not args.show_responses:
-            print("PARSING)")
             parser.print_help()
             return
 
         hub_tasks = []
-        hub_clients = []
         hub_ips = args.harmony_ip.split(",")
         for hub in hub_ips:
             # Connect to the HUB
-            hub_tasks.append(asyncio.ensure_future(get_client(hub,args.show_responses)))
+            hub_tasks.append(asyncio.ensure_future(execute_per_hub(hub, args)))
 
         results = await asyncio.gather(*hub_tasks)
         for idx, result in enumerate(results):
             if isinstance(
                     result,
-                    aioharmony.exceptions.TimeOut):
-                print(f"Timeout connecting to HUB with IP {args.harmony_ip[idx]}.")
-            elif result is not None:
-                hub_clients.append(result)
+                    Exception):
+                raise result
 
-        hub_tasks = []
-        for hub in hub_clients:
-            if hasattr(args, 'func'):
-                coroutine = args.func(hub, args)
-                if coroutine is not None:
-                    hub_tasks.append(asyncio.ensure_future(coroutine))
-
-        results = await asyncio.gather(*hub_tasks)
-        for idx, result in enumerate(results):
-            if isinstance(
-                    result,
-                    aioharmony.exceptions.TimeOut):
-                print(f"Action did not complete within a reasonable time.")
-
-        # Now sleep for provided time.
-        if args.wait >= 0:
-            await asyncio.sleep(args.wait)
-        else:
-            while True:
-                await asyncio.sleep(60)
-
-        hub_tasks = []
-        for hub in hub_clients:
-            hub_tasks.append(hub.close())
-
-        await asyncio.wait_for(asyncio.gather(*hub_tasks), timeout=10)
 
 def cancel_tasks(loop):
 
-    print(f"There are {len(asyncio.all_tasks(loop))} task(s) still running.")
     for task in asyncio.all_tasks(loop):
         task.cancel()
 
