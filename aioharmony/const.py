@@ -16,6 +16,11 @@ DEFAULT_XMPP_HUB_PORT = '5222'
 DEFAULT_WS_HUB_PORT = '8088'
 DEFAULT_HARMONY_MIME = 'vnd.logitech.harmony/vnd.logitech.harmony.engine'
 
+WEBSOCKETS = 'WEBSOCKETS'
+XMPP = 'XMPP'
+
+PROTOCOL = Union[WEBSOCKETS, XMPP]
+
 #
 # The HUB commands that can be send
 #

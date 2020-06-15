@@ -21,8 +21,8 @@ import aioharmony.exceptions as aioexc
 import aioharmony.handler as handlers
 from aioharmony.const import (
     ClientCallbackType, ClientConfigType, ConnectorCallbackType,
-    DEFAULT_XMPP_HUB_PORT, HUB_COMMANDS, SendCommand, SendCommandDevice,
-    SendCommandResponse
+    DEFAULT_XMPP_HUB_PORT, HUB_COMMANDS, PROTOCOL, SendCommand, SendCommandDevice,
+    SendCommandResponse, WEBSOCKETS, XMPP
 )
 from aioharmony.helpers import call_callback, search_dict
 from aioharmony.responsehandler import Handler, ResponseHandler
@@ -41,10 +41,12 @@ class HarmonyClient:
     # pylint: disable=too-many-arguments
     def __init__(self,
                  ip_address: str,
+                 protocol: PROTOCOL = None,
                  callbacks: ClientCallbackType = None,
                  loop: asyncio.AbstractEventLoop = None) -> None:
         _LOGGER.debug("%s: Initialize HUB", ip_address)
         self._ip_address = ip_address
+        self._protocol = protocol
         self._callbacks = callbacks if callbacks is not None else \
             ClientCallbackType(None, None, None, None, None)
         self._loop = loop if loop else asyncio.get_event_loop()
@@ -52,7 +54,6 @@ class HarmonyClient:
         self._hub_config = ClientConfigType({}, {}, {}, {}, None, [], [])
         self._current_activity_id = None
         self._hub_connection = None
-        self._protocol = None
 
         # Get the queue on which JSON responses will be put
         self._response_queue = asyncio.Queue()
@@ -129,28 +130,33 @@ class HarmonyClient:
     async def _websocket_or_xmpp(self) -> bool:
         """ Determine if XMPP is enabled, if not fall-back to web sockets.
         """
+        if self._protocol is None:
+            try:
+                _, _ = await asyncio.open_connection(host=self._ip_address,
+                                                     port=DEFAULT_XMPP_HUB_PORT,
+                                                     loop=self._loop
+                                                     )
+            except ConnectionRefusedError:
+                _LOGGER.warning("%s: XMPP is not enabled, using web sockets "
+                                "however this might not work with future Harmony "
+                                "firmware updates, please enable XMPP",
+                                self.name)
+                self._protocol = WEBSOCKETS
+            except OSError as exc:
+                _LOGGER.error("%s: Unable to determine if XMPP is enabled: %s",
+                              self.name,
+                              exc)
+                return False
+            else:
+                _LOGGER.debug("%s: XMPP is enabled", self.name)
+                self._protocol = XMPP
 
-        try:
-            _, _ = await asyncio.open_connection(host=self._ip_address,
-                                                 port=DEFAULT_XMPP_HUB_PORT,
-                                                 loop=self._loop
-                                                 )
-        except ConnectionRefusedError:
-            _LOGGER.warning("%s: XMPP is not enabled, using web sockets "
-                            "however this might not work with future Harmony "
-                            "firmware updates, please enable XMPP",
-                            self.name)
+        if self._protocol == WEBSOCKETS:
+            _LOGGER.debug("%s: Using WEBSOCKETS", self.name)
             from aioharmony.hubconnector_websocket import HubConnector
-            self._protocol = 'WEBSOCKETS'
-        except OSError as exc:
-            _LOGGER.error("%s: Unable to determine if XMPP is enabled: %s",
-                          self.name,
-                          exc)
-            return False
         else:
-            _LOGGER.debug("%s: XMPP is enabled", self.name)
+            _LOGGER.debug("%s: Using XMPP", self.name)
             from aioharmony.hubconnector_xmpp import HubConnector
-            self._protocol = 'XMPP'
 
         self._hub_connection = HubConnector(
             ip_address=self._ip_address,

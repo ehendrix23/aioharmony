@@ -151,6 +151,7 @@ Release Notes
         - HANDLER_START_ACTIVITY_NOTIFY_STARTED: activity is being started
         - HANDLER_STOP_ACTIVITY_NOTIFY_STARTED: power off is started
         - HANDLER_START_ACTIVITY_NOTIRY_INPROGRESS: activity switch is in progress
+    - New: Protocol to use can be specified (WEBSOCKETS or XMPP) to force specific protocol to be used. If not provided XMPP will be used unless not available then WEBSOCKETS will be used.
     - New: protocol used to connect can now be retrieved. It will return WEBSOCKETS when connected over web sockets or XMPP.
     - New: One can now supply multiple IP addresses for Harmony HUBs when using aioharmony main.
     - New: option activity_monitor for aioharmony main to allow just monitoring of activity changes

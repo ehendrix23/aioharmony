@@ -16,7 +16,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import List, Optional, Union
 from aioharmony.const import (
-    ClientConfigType, SendCommandArg, SendCommandDevice, SendCommandResponse
+    ClientConfigType, PROTOCOL, SendCommandArg, SendCommandDevice, SendCommandResponse
 )
 from aioharmony.harmonyclient import ClientCallbackType, HarmonyClient
 from aioharmony.handler import Handler
@@ -37,13 +37,14 @@ class HarmonyAPI:
     # pylint: disable=too-many-arguments
     def __init__(self,
                  ip_address: str,
+                 protocol: PROTOCOL = None,
                  callbacks: ClientCallbackType = None,
                  loop: asyncio.AbstractEventLoop = None) -> None:
         _LOGGER.debug("%s: Initialize", ip_address)
         loop = loop if loop else asyncio.get_event_loop()
-
         self._harmony_client = HarmonyClient(
             ip_address=ip_address,
+            protocol=protocol,
             callbacks=callbacks,
             loop=loop
         )
