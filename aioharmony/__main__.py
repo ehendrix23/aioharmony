@@ -9,6 +9,7 @@ import json
 import logging
 import re
 import sys
+from datetime import datetime
 from typing import Optional
 
 import aioharmony.exceptions
@@ -68,7 +69,7 @@ async def get_client(ip_address, protocol, show_responses) -> Optional[HarmonyAP
 async def just_listen(client, args):
     # Create handler to output everything.
     def output_response(message):
-        print(f"{client.name}: {message}")
+        print(f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} {client.name}: {message}")
 
     print("Starting to listen on HUB {} with firmware version {}".format(
         client.name,
@@ -89,19 +90,19 @@ async def listen_for_new_activities(client, _):
     def new_activity_starting(activity_info: tuple):
         activity_id, activity_name = activity_info
         if activity_id == -1:
-            print(f"{client.name}: Powering off is starting.")
+            print(f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} {client.name}: Powering off is starting.")
         else:
-            print(f"{client.name}: New activity ID {activity_id} with name {activity_name} is starting.")
+            print(f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} {client.name}: New activity ID {activity_id} with name {activity_name} is starting.")
 
     def new_activity_started(activity_info: tuple):
         activity_id, activity_name = activity_info
         if activity_id == -1:
-            print(f"{client.name}: Powering off completed.")
+            print(f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} {client.name}: Powering off completed.")
         else:
-            print(f"{client.name}: New activity ID {activity_id} with name {activity_name} has started.")
+            print(f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} {client.name}: New activity ID {activity_id} with name {activity_name} has started.")
 
     activity_id, activity_name = client.current_activity
-    print(f"{client.name}: Current activity ID {activity_id} with name {activity_name}")
+    print(f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} {client.name}: Current activity ID {activity_id} with name {activity_name}")
 
     callbacks = {
         "config_updated": client.callbacks.config_updated,
@@ -448,7 +449,7 @@ async def run():
     _ROOTLOGGER.setLevel(loglevels[args.loglevel])
     _ROOTLOGGER.addHandler(log_stream)
 
-    if hasattr(args, 'logmodules'):
+    if args.logmodules is not None:
         log_modules = args.logmodules.split(",")
         log_filter = LoggingFilter(log_modules)
         log_stream.addFilter(log_filter)
