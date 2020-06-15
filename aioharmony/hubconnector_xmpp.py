@@ -226,6 +226,7 @@ class HubConnector(slixmpp.ClientXMPP):
                 with timeout(DEFAULT_TIMEOUT):
                     await disconnected
             except asyncio.TimeoutError:
+                _LOGGER.debug("%s: Timeout trying to disconnect.", self._ip_address)
                 self.del_event_handler('disconnected', disconnect_result)
                 raise aioexc.TimeOut
 
