@@ -91,7 +91,7 @@ class HubConnector(slixmpp.ClientXMPP):
         """Register all the different handlers within XMPP based on
 
         messages being received and events."""
-
+        _LOGGER.debug("%s: Registering internal handlers.", self._ip_address)
         # Register the callback for messages being received
         self._listener()
 
@@ -109,6 +109,7 @@ class HubConnector(slixmpp.ClientXMPP):
 
     def _deregister_handlers(self):
         # Remove handlers.
+        _LOGGER.debug("%s: Removing internal handlers.", self._ip_address)
         self.del_event_handler('connected', self._connected_handler)
         self.del_event_handler('disconnected', self._disconnected_handler)
         self.remove_handler('listener')
