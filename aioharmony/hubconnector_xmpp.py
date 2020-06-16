@@ -61,12 +61,15 @@ class HubConnector(slixmpp.ClientXMPP):
 
         self._connected = False
 
-        plugin_config = {
+        self._plugin_config = {
             # Enables PLAIN authentication which is off by default.
             'feature_mechanisms': {'unencrypted_plain': True},
         }
+        self._init_super()
+
+    def _init_super(self):
         super(HubConnector, self).__init__(
-            DEFAULT_USER, DEFAULT_PASSWORD, plugin_config=plugin_config)
+            DEFAULT_USER, DEFAULT_PASSWORD, plugin_config=self._plugin_config)
 
         # Set keep-alive to 30 seconds.
         self.whitespace_keepalive_interval = 30
@@ -103,6 +106,12 @@ class HubConnector(slixmpp.ClientXMPP):
                                self._disconnected_handler,
                                disposable=False,
                                )
+
+    def _deregister_handlers(self):
+        # Remove handlers.
+        self.del_event_handler('connected', self._connected_handler)
+        self.del_event_handler('disconnected', self._disconnected_handler)
+        self.remove_handler('listener')
 
     async def close(self):
         """Close all connections and tasks
@@ -186,6 +195,7 @@ class HubConnector(slixmpp.ClientXMPP):
                 return False
 
             # Remove the handlers.
+            self._connected = True
             remove_handlers()
             _LOGGER.debug("%s: Connected to hub", self._ip_address)
             return True
@@ -208,12 +218,7 @@ class HubConnector(slixmpp.ClientXMPP):
             def disconnect_result(_):
                 disconnected.set_result(True)
 
-            self.del_event_handler('connected',
-                                   self._connected_handler)
-            self.del_event_handler('disconnected',
-                                   self._disconnected_handler)
-
-            self.remove_handler('listener')
+            self._deregister_handlers()
 
             self.add_event_handler('disconnected',
                                    disconnect_result,
@@ -261,6 +266,10 @@ class HubConnector(slixmpp.ClientXMPP):
                       self._ip_address)
         self._connected = False
         is_reconnect = False
+
+        self._deregister_handlers()
+        self._init_super()
+
         sleep_time = 1
         await asyncio.sleep(sleep_time)
         while True:
