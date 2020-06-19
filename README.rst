@@ -142,6 +142,22 @@ Release Notes
     - Remote ID was not retrieved anymore, this is now available again
     - If HUB disconnects when retrieving information then retrieval will be retried.
     - Executing aioharmony with option show_detailed_config will now show all config retrieved from HUB
+0.2.5
+    - Fixed: When using XMPP protocol the switching of an activity was not always discovered.
+    - Fixed: Call to stop handlers will now be called when timeout occurs on disconnect
+    - Changed: ClientCallbackType is now in aioharmony.const instead of aioharmony.harmonyclient.
+    - Changed: default log level for aioharmony main is now ERROR
+    - New: callback option new_activity_starting to allow a callback when a new activity is being started (new_activity is called when switching activity is completed)
+    - New: 3 new HANDLER types have been added:
+        - HANDLER_START_ACTIVITY_NOTIFY_STARTED: activity is being started
+        - HANDLER_STOP_ACTIVITY_NOTIFY_STARTED: power off is started
+        - HANDLER_START_ACTIVITY_NOTIRY_INPROGRESS: activity switch is in progress
+    - New: Protocol to use can be specified (WEBSOCKETS or XMPP) to force specific protocol to be used. If not provided XMPP will be used unless not available then WEBSOCKETS will be used.
+    - New: protocol used to connect can now be retrieved. It will return WEBSOCKETS when connected over web sockets or XMPP.
+    - New: One can now supply multiple IP addresses for Harmony HUBs when using aioharmony main.
+    - New: option activity_monitor for aioharmony main to allow just monitoring of activity changes
+    - New: option logmodules for aioharmony main to specify the modules to put logging information for
+
 
 
 TODO

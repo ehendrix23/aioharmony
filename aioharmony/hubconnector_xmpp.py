@@ -61,12 +61,15 @@ class HubConnector(slixmpp.ClientXMPP):
 
         self._connected = False
 
-        plugin_config = {
+        self._plugin_config = {
             # Enables PLAIN authentication which is off by default.
             'feature_mechanisms': {'unencrypted_plain': True},
         }
+        self._init_super()
+
+    def _init_super(self):
         super(HubConnector, self).__init__(
-            DEFAULT_USER, DEFAULT_PASSWORD, plugin_config=plugin_config)
+            DEFAULT_USER, DEFAULT_PASSWORD, plugin_config=self._plugin_config)
 
         # Set keep-alive to 30 seconds.
         self.whitespace_keepalive_interval = 30
@@ -88,7 +91,7 @@ class HubConnector(slixmpp.ClientXMPP):
         """Register all the different handlers within XMPP based on
 
         messages being received and events."""
-
+        _LOGGER.debug("%s: Registering internal handlers.", self._ip_address)
         # Register the callback for messages being received
         self._listener()
 
@@ -103,6 +106,13 @@ class HubConnector(slixmpp.ClientXMPP):
                                self._disconnected_handler,
                                disposable=False,
                                )
+
+    def _deregister_handlers(self):
+        # Remove handlers.
+        _LOGGER.debug("%s: Removing internal handlers.", self._ip_address)
+        self.del_event_handler('connected', self._connected_handler)
+        self.del_event_handler('disconnected', self._disconnected_handler)
+        self.remove_handler('listener')
 
     async def close(self):
         """Close all connections and tasks
@@ -186,6 +196,7 @@ class HubConnector(slixmpp.ClientXMPP):
                 return False
 
             # Remove the handlers.
+            self._connected = True
             remove_handlers()
             _LOGGER.debug("%s: Connected to hub", self._ip_address)
             return True
@@ -208,13 +219,7 @@ class HubConnector(slixmpp.ClientXMPP):
             def disconnect_result(_):
                 disconnected.set_result(True)
 
-            self.del_event_handler('connected',
-                                   self._connected_handler)
-            self.del_event_handler('disconnected',
-                                   self._disconnected_handler)
-
-            self.remove_handler('listener')
-
+            self._deregister_handlers()
             self.add_event_handler('disconnected',
                                    disconnect_result,
                                    disposable=True,
@@ -226,6 +231,7 @@ class HubConnector(slixmpp.ClientXMPP):
                 with timeout(DEFAULT_TIMEOUT):
                     await disconnected
             except asyncio.TimeoutError:
+                _LOGGER.debug("%s: Timeout trying to disconnect.", self._ip_address)
                 self.del_event_handler('disconnected', disconnect_result)
                 raise aioexc.TimeOut
 
@@ -260,6 +266,10 @@ class HubConnector(slixmpp.ClientXMPP):
                       self._ip_address)
         self._connected = False
         is_reconnect = False
+
+        self._deregister_handlers()
+        self._init_super()
+
         sleep_time = 1
         await asyncio.sleep(sleep_time)
         while True:
@@ -342,39 +352,41 @@ class HubConnector(slixmpp.ClientXMPP):
         """Enable callback"""
         def message_received(event):
             payload = event.get_payload()
-            if len(payload) != 1:
-                _LOGGER.error("%s: Invalid payload length of %s received",
+            if len(payload) == 0:
+                _LOGGER.error("%s: Invalid payload length of 0 received.",
                               self._ip_address,
                               len(payload))
                 return
 
-            message = payload[0]
-            data = {}
-            # Try to convert JSON object if JSON object was received
-            if message.text is not None and message.text != '':
-                try:
-                    data = json.loads(message.text)
-                except json.JSONDecodeError:
-                    # Should mean only a single value was received.
-                    for item in message.text.split(':'):
-                        item_split = item.split('=')
-                        if len(item_split) == 2:
-                            data.update({item_split[0]: item_split[1]})
+            for message in payload:
+                data = {}
+                # Try to convert JSON object if JSON object was received
+                if message.text is not None and message.text != '':
+                    try:
+                        data = json.loads(message.text)
+                    except json.JSONDecodeError:
+                        # Should mean only a single value was received.
+                        for item in message.text.split(':'):
+                            item_split = item.split('=')
+                            if len(item_split) == 2:
+                                data.update({item_split[0]: item_split[1]})
 
-            # Create response dictionary
-            response = {
-                'id': event.get('id'),
-                'xmlns': message.attrib.get('xmlns'),
-                'cmd': message.attrib.get('mime'),
-                'type': message.attrib.get('type'),
-                'code': int(message.attrib.get('errorcode', '0')),
-                'codestring': message.attrib.get('errorstring'),
-                'data': data,
-            }
-            _LOGGER.debug("%s: Response payload: %s", self._ip_address,
-                          response)
-            # Put response on queue.
-            self._response_queue.put_nowait(response)
+                # Create response dictionary
+                response = {
+                    'id': event.get('id'),
+                    'xmlns': message.attrib.get('xmlns'),
+                    'cmd': message.attrib.get('mime'),
+                    'type': message.attrib.get('type'),
+                    'code': int(message.attrib.get('errorcode', '0')),
+                    'codestring': message.attrib.get('errorstring'),
+                    'data': data,
+                }
+                _LOGGER.debug("%s: Response payload: %s", self._ip_address,
+                              response)
+                # Put response on queue.
+                self._response_queue.put_nowait(response)
+
+        self._listener_message_received = message_received
 
         self._listener_message_received = message_received
 
