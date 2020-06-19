@@ -536,6 +536,7 @@ class HarmonyClient:
         _LOGGER.debug("%s: Retrieving current activity", self.name)
 
         # Send the command to the HUB
+
         try:
             with timeout(DEFAULT_TIMEOUT/2):
                 response = await self.send_to_hub(command='get_current_activity', send_timeout=DEFAULT_TIMEOUT/4)
