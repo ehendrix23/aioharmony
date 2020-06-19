@@ -35,19 +35,18 @@ Usage
 
 .. code:: bash
 
-    aioharmony - Harmony device control
-
-    usage: aioharmony [-h] (--harmony_ip HARMONY_IP | --discover)
-                      [--harmony_port HARMONY_PORT]
-                      [--loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
-                      [--show_responses | --no-show_responses] [--wait WAIT]
-                      {show_config,show_detailed_config,show_current_activity,start_activity,power_off,sync,listen,send_command,change_channel}
-                      ...
+    usage: __main__.py [-h] (--harmony_ip HARMONY_IP | --discover)
+                       [--protocol {WEBSOCKETS,XMPP}]
+                       [--loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
+                       [--logmodules LOGMODULES]
+                       [--show_responses | --no-show_responses] [--wait WAIT]
+                       {show_config,show_detailed_config,show_current_activity,start_activity,power_off,sync,listen,activity_monitor,send_command,change_channel}
+                       ...
 
     aioharmony - Harmony device control
 
     positional arguments:
-      {show_config,show_detailed_config,show_current_activity,start_activity,power_off,sync,listen,send_command,change_channel}
+      {show_config,show_detailed_config,show_current_activity,start_activity,power_off,sync,listen,activity_monitor,send_command,change_channel}
         show_config         Print the Harmony device configuration.
         show_detailed_config
                             Print the detailed Harmony device configuration.
@@ -56,21 +55,34 @@ Usage
         start_activity      Switch to a different activity.
         power_off           Stop the activity.
         sync                Sync the harmony.
-        listen              Output everything HUB sends out
+        listen              Output everything HUB sends out. Use in combination
+                            with --wait.
+        activity_monitor    Monitor and show when an activity is changing. Use in
+                            combination with --wait to keep monitoring
+                            foractivities otherwise only current activity will be
+                            shown.
         send_command        Send a simple command.
         change_channel      Change the channel
 
     optional arguments:
       -h, --help            show this help message and exit
       --harmony_ip HARMONY_IP
-                            IP Address of the Harmony device. (default: None)
+                            IP Address of the Harmony device, multiple IPs can be
+                            specified as a comma separated list without spaces.
+                            (default: None)
       --discover            Scan for Harmony devices. (default: False)
-      --harmony_port HARMONY_PORT
-                            Network port that the Harmony is listening on.
-                            (default: 5222)
+      --protocol {WEBSOCKETS,XMPP}
+                            Protocol to use to connect to HUB. Note for XMPP one
+                            has to ensure that XMPP is enabledon the hub.
+                            (default: None)
       --loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}
                             Logging level for all components to print to the
-                            console. (default: INFO)
+                            console. (default: ERROR)
+      --logmodules LOGMODULES
+                            Restrict logging to modules specified. Multiple can be
+                            provided as a comma separated list without any spaces.
+                            Use * to include any further submodules. (default:
+                            None)
       --show_responses      Print out responses coming from HUB. (default: False)
       --no-show_responses   Do not print responses coming from HUB. (default:
                             False)
@@ -78,7 +90,6 @@ Usage
                             in combination with --show-responses. Use -1 to wait
                             infinite, otherwise has to be a positive number.
                             (default: 0)
-
 
 Release Notes
 -------------
