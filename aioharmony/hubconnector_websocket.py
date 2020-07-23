@@ -121,7 +121,7 @@ class HubConnector:
             if self._websocket is not None and not self._websocket.closed:
                 return True
 
-            _LOGGER.debug("%s: Starting connect.", self._ip_address)
+            _LOGGER.debug("%s: Connecting to hub", self._ip_address)
 
             if is_reconnect:
                 log_level = 10

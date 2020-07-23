@@ -136,6 +136,11 @@ class HubConnector(slixmpp.ClientXMPP):
 
             _LOGGER.debug("%s: Connecting to hub", self._ip_address)
 
+            if is_reconnect:
+                log_level = 10
+            else:
+                log_level = 40
+
             loop = asyncio.get_event_loop()
             connected = loop.create_future()
 
@@ -175,9 +180,9 @@ class HubConnector(slixmpp.ClientXMPP):
                 )
 
             except IqTimeout:
-                if not is_reconnect:
-                    _LOGGER.error("%s: Connection timed out for hub",
-                                  self._ip_address)
+                _LOGGER.log(log_level,
+                            "%s: Connection timed out for hub",
+                            self._ip_address)
 
                 # Remove the handlers.
                 remove_handlers()
@@ -186,11 +191,24 @@ class HubConnector(slixmpp.ClientXMPP):
             # Wait till we're connected.
             try:
                 await connected
-            except asyncio.TimeoutError:
+            except (asyncio.TimeoutError, TimeoutError):
+                _LOGGER.log(log_level,
+                            "%s: Timeout waiting for connecting to hub",
+                            self._ip_address)
                 # Remove the handlers.
                 remove_handlers()
                 raise aioexc.TimeOut
-            except (asyncio.CancelledError, TimeoutError):
+            except asyncio.CancelledError:
+                _LOGGER.debug("%s: Connecting to hub has been cancelled",
+                            self._ip_address)
+                # Remove the handlers.
+                remove_handlers()
+                return False
+            except OSError as exc:
+                _LOGGER.log(log_level,
+                            "%s: Connecting to HUB failed with error: %s",
+                            self._ip_address,
+                            exc)
                 # Remove the handlers.
                 remove_handlers()
                 return False

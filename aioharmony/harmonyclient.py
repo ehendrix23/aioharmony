@@ -141,7 +141,7 @@ class HarmonyClient:
                     _LOGGER.warning("%s: XMPP is not enabled on this HUB, will be defaulting back to WEBSOCKETS.",
                                     self.name)
                 else:
-                    _LOGGER.warning("%s: XMPP is not enabled, using web sockets "
+                    _LOGGER.debug("%s: XMPP is not enabled, using web sockets "
                                     "however this might not work with future Harmony "
                                     "firmware updates, please enable XMPP",
                                     self.name)
