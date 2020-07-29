@@ -168,7 +168,9 @@ Release Notes
     - New: One can now supply multiple IP addresses for Harmony HUBs when using aioharmony main.
     - New: option activity_monitor for aioharmony main to allow just monitoring of activity changes
     - New: option logmodules for aioharmony main to specify the modules to put logging information for
-
+0.2.6
+    - Changed: If XMPP not enabled and no protocol provided then message will be DEBUG instead of Warning to enable XMPP.
+    - Fixed: If connect using XMPP fails with for example Connection Refused then it will be logged now and connection marked as failed for reconnection.
 
 
 TODO
