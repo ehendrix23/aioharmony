@@ -170,7 +170,7 @@ Release Notes
     - New: option logmodules for aioharmony main to specify the modules to put logging information for
 0.2.6
     - Changed: If XMPP not enabled and no protocol provided then message will be DEBUG instead of Warning to enable XMPP.
-    - Fixed: If unable to connect using XMPP fails with for example Connection Refused then it will be logged now and connection marked as failed.
+    - Fixed: If connect using XMPP fails with for example Connection Refused then it will be logged now and connection marked as failed for reconnection.
 
 
 TODO
