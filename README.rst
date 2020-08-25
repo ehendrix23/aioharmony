@@ -171,6 +171,8 @@ Release Notes
 0.2.6
     - Changed: If XMPP not enabled and no protocol provided then message will be DEBUG instead of Warning to enable XMPP.
     - Fixed: If connect using XMPP fails with for example Connection Refused then it will be logged now and connection marked as failed for reconnection.
+0.2.7
+    - Changed:
 
 
 TODO
