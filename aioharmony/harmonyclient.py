@@ -480,6 +480,7 @@ class HarmonyClient:
             }
 
         response = None
+        handler_uuid = None
         if wait:
             response = self._loop.create_future()
             resp_handler = Handler(handler_obj=response,
@@ -488,9 +489,8 @@ class HarmonyClient:
                                    expiration=timedelta(
                                        seconds=DEFAULT_TIMEOUT)
                                    )
-            self.register_handler(handler=resp_handler,
-                                  msgid=msgid)
-
+            handler_uuid = self.register_handler(handler=resp_handler,
+                                                 msgid=msgid)
         try:
             with timeout(send_timeout):
                 send_response = await self._hub_connection.hub_send(
@@ -504,8 +504,12 @@ class HarmonyClient:
                 )
                 if send_response is None:
                     # There was an issue
+                    if handler_uuid is not None:
+                        self.unregister_handler(handler_uuid=handler_uuid)
                     return False
         except asyncio.TimeoutError:
+            if handler_uuid is not None:
+                self.unregister_handler(handler_uuid=handler_uuid)
             raise aioexc.TimeOut
 
         if asyncio.isfuture(send_response):
@@ -518,6 +522,8 @@ class HarmonyClient:
             with timeout(send_timeout):
                 await response
         except asyncio.TimeoutError:
+            if handler_uuid is not None:
+                self.unregister_handler(handler_uuid=handler_uuid)
             raise aioexc.TimeOut
 
         return response.result()
