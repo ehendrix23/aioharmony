@@ -323,15 +323,8 @@ class HarmonyClient:
                 elif isinstance(result, Exception):
                     # Other exception, raise it.
                     raise result
-            try:
-                # Retrieve current activity, done only once config received.
-                with timeout(DEFAULT_TIMEOUT):
-                    await self._get_current_activity()
-            except asyncio.TimeoutError:
-                _LOGGER.error("%s: Timeout trying to retrieve current "
-                              "activity.",
-                              self.name)
-                return
+
+            await self._get_current_activity()
 
         # If we were provided a callback handler then call it now.
         if self._callbacks.config_updated:
@@ -544,7 +537,7 @@ class HarmonyClient:
                 with timeout(DEFAULT_TIMEOUT/2):
                     response = await self.send_to_hub(command='get_current_activity', send_timeout=DEFAULT_TIMEOUT/4)
             except (asyncio.TimeoutError, aioexc.TimeOut):
-                _LOGGER.error("%s: Timeout trying to retrieve current activity.",
+                _LOGGER.error("%s: Second Timeout trying to retrieve current activity.",
                               self.name)
                 response = None
 
