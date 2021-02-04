@@ -173,6 +173,8 @@ Release Notes
     - Fixed: If connect using XMPP fails with for example Connection Refused then it will be logged now and connection marked as failed for reconnection.
 0.2.7
     - Fixed: Registered handlers would not be unregistered after a timeout when sending commands to HUB.
+    - Updated slixmpp from >= 1.5.2 to >= 1.7.0
+    - Updated aiohttp from >= 3.4  to 3.7.3
 
 
 TODO
