@@ -91,6 +91,7 @@ Usage
                             infinite, otherwise has to be a positive number.
                             (default: 0)
 
+
 Release Notes
 -------------
 
@@ -171,6 +172,10 @@ Release Notes
 0.2.6
     - Changed: If XMPP not enabled and no protocol provided then message will be DEBUG instead of Warning to enable XMPP.
     - Fixed: If connect using XMPP fails with for example Connection Refused then it will be logged now and connection marked as failed for reconnection.
+0.2.7
+    - Fixed: Registered handlers would not be unregistered after a timeout when sending commands to HUB.
+    - Updated slixmpp from >= 1.5.2 to >= 1.7.0
+    - Updated aiohttp from >= 3.4  to 3.7.3
 
 
 TODO

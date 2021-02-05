@@ -238,6 +238,7 @@ class HubConnector(slixmpp.ClientXMPP):
                 disconnected.set_result(True)
 
             self._deregister_handlers()
+
             self.add_event_handler('disconnected',
                                    disconnect_result,
                                    disposable=True,
@@ -403,8 +404,6 @@ class HubConnector(slixmpp.ClientXMPP):
                               response)
                 # Put response on queue.
                 self._response_queue.put_nowait(response)
-
-        self._listener_message_received = message_received
 
         self._listener_message_received = message_received
 

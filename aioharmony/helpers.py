@@ -75,7 +75,6 @@ def call_raw_callback(callback: CallbackType,
     :return: True if callback was done successfully, False if it wasn't
     :rtype: bool
     """
-    called_callback = False
     if asyncio.isfuture(callback):
         # It is a future, set the result of the future to
         # the message.
@@ -84,15 +83,13 @@ def call_raw_callback(callback: CallbackType,
                           "set",
                           callback_name,
                           callback_uuid)
-
         else:
             _LOGGER.debug("Future %s with UUID %s is set",
                           callback_name,
                           callback_uuid)
             callback.set_result(result)
-            called_callback = True
 
-        return called_callback
+        return True
 
     if isinstance(callback, asyncio.Event):
         # It is an event, set the event.

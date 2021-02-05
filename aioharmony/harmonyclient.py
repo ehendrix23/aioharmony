@@ -323,15 +323,8 @@ class HarmonyClient:
                 elif isinstance(result, Exception):
                     # Other exception, raise it.
                     raise result
-            try:
-                # Retrieve current activity, done only once config received.
-                with timeout(DEFAULT_TIMEOUT):
-                    await self._get_current_activity()
-            except asyncio.TimeoutError:
-                _LOGGER.error("%s: Timeout trying to retrieve current "
-                              "activity.",
-                              self.name)
-                return
+
+            await self._get_current_activity()
 
         # If we were provided a callback handler then call it now.
         if self._callbacks.config_updated:
@@ -487,6 +480,7 @@ class HarmonyClient:
             }
 
         response = None
+        handler_uuid = None
         if wait:
             response = self._loop.create_future()
             resp_handler = Handler(handler_obj=response,
@@ -495,9 +489,8 @@ class HarmonyClient:
                                    expiration=timedelta(
                                        seconds=DEFAULT_TIMEOUT)
                                    )
-            self.register_handler(handler=resp_handler,
-                                  msgid=msgid)
-
+            handler_uuid = self.register_handler(handler=resp_handler,
+                                                 msgid=msgid)
         try:
             with timeout(send_timeout):
                 send_response = await self._hub_connection.hub_send(
@@ -511,8 +504,12 @@ class HarmonyClient:
                 )
                 if send_response is None:
                     # There was an issue
+                    if handler_uuid is not None:
+                        self.unregister_handler(handler_uuid=handler_uuid)
                     return False
         except asyncio.TimeoutError:
+            if handler_uuid is not None:
+                self.unregister_handler(handler_uuid=handler_uuid)
             raise aioexc.TimeOut
 
         if asyncio.isfuture(send_response):
@@ -525,6 +522,8 @@ class HarmonyClient:
             with timeout(send_timeout):
                 await response
         except asyncio.TimeoutError:
+            if handler_uuid is not None:
+                self.unregister_handler(handler_uuid=handler_uuid)
             raise aioexc.TimeOut
 
         return response.result()
@@ -534,7 +533,6 @@ class HarmonyClient:
         _LOGGER.debug("%s: Retrieving current activity", self.name)
 
         # Send the command to the HUB
-
         try:
             with timeout(DEFAULT_TIMEOUT/2):
                 response = await self.send_to_hub(command='get_current_activity', send_timeout=DEFAULT_TIMEOUT/4)
@@ -545,7 +543,7 @@ class HarmonyClient:
                 with timeout(DEFAULT_TIMEOUT/2):
                     response = await self.send_to_hub(command='get_current_activity', send_timeout=DEFAULT_TIMEOUT/4)
             except (asyncio.TimeoutError, aioexc.TimeOut):
-                _LOGGER.error("%s: Timeout trying to retrieve current activity.",
+                _LOGGER.error("%s: Second Timeout trying to retrieve current activity.",
                               self.name)
                 response = None
 
