@@ -197,7 +197,7 @@ class HubConnector(slixmpp.ClientXMPP):
                             self._ip_address)
                 # Remove the handlers.
                 remove_handlers()
-                raise aioexc.TimeOut
+                return False
             except asyncio.CancelledError:
                 _LOGGER.debug("%s: Connecting to hub has been cancelled",
                             self._ip_address)
