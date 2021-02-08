@@ -25,6 +25,7 @@ hub_client = None
 _ROOTLOGGER = logging.getLogger()
 _LOGGER = logging.getLogger(__name__)
 
+
 class LoggingFilter(logging.Filter):
     def __init__(self, modules):
         self._modules = modules
@@ -34,6 +35,7 @@ class LoggingFilter(logging.Filter):
             if record.name == module or re.search(module, record.name) is not None:
                 return True
         return False
+
 
 async def get_client(ip_address, protocol, show_responses) -> Optional[HarmonyAPI]:
     client = HarmonyAPI(ip_address=ip_address, protocol=protocol)
@@ -85,24 +87,27 @@ async def just_listen(client, args):
 
     return
 
-async def listen_for_new_activities(client, _):
 
+async def listen_for_new_activities(client, _):
     def new_activity_starting(activity_info: tuple):
         activity_id, activity_name = activity_info
         if activity_id == -1:
             print(f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} {client.name}: Powering off is starting.")
         else:
-            print(f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} {client.name}: New activity ID {activity_id} with name {activity_name} is starting.")
+            print(
+                f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} {client.name}: New activity ID {activity_id} with name {activity_name} is starting.")
 
     def new_activity_started(activity_info: tuple):
         activity_id, activity_name = activity_info
         if activity_id == -1:
             print(f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} {client.name}: Powering off completed.")
         else:
-            print(f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} {client.name}: New activity ID {activity_id} with name {activity_name} has started.")
+            print(
+                f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} {client.name}: New activity ID {activity_id} with name {activity_name} has started.")
 
     activity_id, activity_name = client.current_activity
-    print(f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} {client.name}: Current activity ID {activity_id} with name {activity_name}")
+    print(
+        f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} {client.name}: Current activity ID {activity_id} with name {activity_name}")
 
     callbacks = {
         "config_updated": client.callbacks.config_updated,
@@ -134,7 +139,7 @@ async def show_detailed_config(client, _):
 
     if config:
         print(f"HUB: {client.name}")
-        print(f"\t {json.dumps(client.hub_config, sort_keys=True, indent=4,separators=(',', ': '))}")
+        print(f"\t {json.dumps(client.hub_config, sort_keys=True, indent=4, separators=(',', ': '))}")
     else:
         print(f"HUB: {client.name} There was a problem retrieving the configuration")
 
@@ -179,6 +184,7 @@ async def start_activity(client, args):
             print(f"HUB: {client.name} Activity start failed: {status[1]}")
     else:
         print(f"HUB: {client.name} Invalid activity: {args.activity}")
+
 
 async def power_off(client, _):
     """Power off Harmony Hub.
@@ -228,11 +234,11 @@ async def send_command(client, args):
         for result in result_list:
             print("HUB: {} Sending of command {} to device {} failed with code {}: "
                   "{}".format(
-                      client.name,
-                      result.command.command,
-                      result.command.device,
-                      result.code,
-                      result.msg))
+                client.name,
+                result.command.command,
+                result.command.device,
+                result.code,
+                result.msg))
     else:
         print(f"HUB: {client.name} Command Sent")
 
@@ -274,8 +280,8 @@ async def sync(client, _):
     else:
         print(f"HUB: {client.name} Sync failed")
 
-async def execute_per_hub(hub, args):
 
+async def execute_per_hub(hub, args):
     # Connect to the HUB
     try:
         _LOGGER.debug("%s: Connecting to HUB", hub)
@@ -317,6 +323,8 @@ async def execute_per_hub(hub, args):
             _LOGGER.debug("%s: Timeout trying to close connection to HUB.", hub)
 
     _LOGGER.debug("%s: All done with HUB.", hub)
+
+
 async def run():
     """Main method for the script."""
     global hub_client
@@ -329,18 +337,18 @@ async def run():
 
     # Required flags go here.
     required_flags.add_argument('--harmony_ip',
-                        help='IP Address of the Harmony device, multiple IPs can be specified as a comma separated'
-                             ' list without spaces.')
+                                help='IP Address of the Harmony device, multiple IPs can be specified as a comma separated'
+                                     ' list without spaces.')
     required_flags.add_argument('--discover',
-                        action='store_true',
-                        help='Scan for Harmony devices.')
+                                action='store_true',
+                                help='Scan for Harmony devices.')
 
     # Flags with default values go here.
     loglevels = dict((logging.getLevelName(level), level)
                      for level in [10, 20, 30, 40, 50])
     parser.add_argument('--protocol',
                         required=False,
-                        choices=[WEBSOCKETS,XMPP],
+                        choices=[WEBSOCKETS, XMPP],
                         help=('Protocol to use to connect to HUB. Note for XMPP one has to ensure that XMPP is enabled'
                               'on the hub.'))
     parser.add_argument('--loglevel',
@@ -482,7 +490,6 @@ async def run():
 
 
 def cancel_tasks(loop):
-
     _LOGGER.debug("Cancelling any tasks still running.")
     loop.run_until_complete(asyncio.sleep(1))
     for task in asyncio.all_tasks(loop):
@@ -493,6 +500,7 @@ def cancel_tasks(loop):
         loop.run_until_complete(asyncio.sleep(1))
         if len(asyncio.all_tasks(loop)) == 0:
             break
+
 
 def main() -> None:
     loop = asyncio.new_event_loop()
@@ -506,6 +514,7 @@ def main() -> None:
         cancel_tasks(loop)
         loop.close()
         print("Closed.")
+
 
 if __name__ == '__main__':
     sys.exit(main())
