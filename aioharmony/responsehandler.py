@@ -9,14 +9,13 @@ the HUB through callbacks.
 """
 
 import asyncio
+from datetime import datetime, timedelta, timezone
 import logging
-from typing import (
-    List, NamedTuple, Optional, Pattern, Union, Tuple
-)
+from typing import List, NamedTuple, Optional, Pattern, Tuple, Union
 from uuid import uuid4
-from datetime import datetime, timezone, timedelta
-from aioharmony.helpers import call_callback
+
 from aioharmony.handler import Handler
+from aioharmony.helpers import call_callback
 
 DEFAULT_TIMEOUT = 60
 
@@ -24,17 +23,17 @@ _LOGGER = logging.getLogger(__name__)
 
 DataPatternType = Tuple[str, Pattern]
 
-RespDataPatternType = Union[
-    List[DataPatternType],
-    DataPatternType
-]
+RespDataPatternType = Union[List[DataPatternType], DataPatternType]
 
-CallbackEntryType = NamedTuple('CallbackEntryType',
-                               [('handler_uuid', str),
-                                ('msgid', Optional[str]),
-                                ('expiration', Optional[datetime]),
-                                ('handler', Handler)
-                                ])
+CallbackEntryType = NamedTuple(
+    "CallbackEntryType",
+    [
+        ("handler_uuid", str),
+        ("msgid", Optional[str]),
+        ("expiration", Optional[datetime]),
+        ("handler", Handler),
+    ],
+)
 
 
 class ResponseHandler:
@@ -55,9 +54,7 @@ class ResponseHandler:
     :type message_queue: asyncio.Queue
     """
 
-    def __init__(self,
-                 message_queue: asyncio.Queue,
-                 name: str = None) -> None:
+    def __init__(self, message_queue: asyncio.Queue, name: str = None) -> None:
         """"""
         self._message_queue = message_queue
         self._name = name
@@ -68,19 +65,19 @@ class ResponseHandler:
     async def close(self):
         """Close all connections and tasks
 
-           This should be called to ensure everything is stopped and
-           cancelled out.
+        This should be called to ensure everything is stopped and
+        cancelled out.
         """
         # Stop callback task
         if self._callback_task and not self._callback_task.done():
             self._callback_task.cancel()
 
-    def register_handler(self,
-                         handler: Handler,
-                         msgid: str = None,
-                         expiration: Union[
-                             datetime,
-                             timedelta] = None) -> str:
+    def register_handler(
+        self,
+        handler: Handler,
+        msgid: str = None,
+        expiration: Union[datetime, timedelta] = None,
+    ) -> str:
         """Register a handler.
 
         :param handler: Handler object to be registered
@@ -108,31 +105,35 @@ class ResponseHandler:
             expiration = datetime.now(timezone.utc) + expiration
 
         if expiration is None:
-            _LOGGER.debug("%s: Registering handler %s with UUID %s",
-                          self._name,
-                          handler.handler_name,
-                          handler_uuid)
+            _LOGGER.debug(
+                "%s: Registering handler %s with UUID %s",
+                self._name,
+                handler.handler_name,
+                handler_uuid,
+            )
         else:
             if expiration.tzinfo is None:
                 expiration = expiration.replace(tzinfo=timezone.utc)
 
-            _LOGGER.debug("%s: Registering handler %s with UUID %s that will "
-                          "expire on %s",
-                          self._name,
-                          handler.handler_name,
-                          handler_uuid,
-                          expiration.astimezone())
+            _LOGGER.debug(
+                "%s: Registering handler %s with UUID %s that will " "expire on %s",
+                self._name,
+                handler.handler_name,
+                handler_uuid,
+                expiration.astimezone(),
+            )
 
-        self._handler_list.append(CallbackEntryType(
-            handler_uuid=handler_uuid,
-            msgid=msgid,
-            expiration=expiration,
-            handler=handler
-        ))
+        self._handler_list.append(
+            CallbackEntryType(
+                handler_uuid=handler_uuid,
+                msgid=msgid,
+                expiration=expiration,
+                handler=handler,
+            )
+        )
         return handler_uuid
 
-    def unregister_handler(self,
-                           handler_uuid: str) -> bool:
+    def unregister_handler(self, handler_uuid: str) -> bool:
         """Unregister a handler.
 
         :param handler_uuid: Handler UUID, this is returned by
@@ -142,12 +143,15 @@ class ResponseHandler:
                  not found
         :rtype: bool
         """
-        _LOGGER.debug("%s: Unregistering handler with UUID %s",
-                      self._name,
-                      handler_uuid)
+        _LOGGER.debug(
+            "%s: Unregistering handler with UUID %s", self._name, handler_uuid
+        )
         found_uuid = False
-        for index in [index for index, element in enumerate(self._handler_list)
-                      if element.handler_uuid == handler_uuid]:
+        for index in [
+            index
+            for index, element in enumerate(self._handler_list)
+            if element.handler_uuid == handler_uuid
+        ]:
             del self._handler_list[index]
             found_uuid = True
             break
@@ -173,9 +177,9 @@ class ResponseHandler:
                 return False
 
             for new_key in value:
-                if not self._handler_match(dict_list=value,
-                                           message=message,
-                                           key=new_key):
+                if not self._handler_match(
+                    dict_list=value, message=message, key=new_key
+                ):
                     return False
             return True
 
@@ -194,8 +198,7 @@ class ResponseHandler:
 
         return value == message
 
-    def _get_handlers(self,
-                      message: dict) -> List[CallbackEntryType]:
+    def _get_handlers(self, message: dict) -> List[CallbackEntryType]:
         """
         Find the handlers to be called for the JSON message received
 
@@ -209,32 +212,33 @@ class ResponseHandler:
         for handler in self._handler_list:
 
             if handler.msgid is not None:
-                if message.get('id') is None or \
-                        message.get('id') != handler.msgid:
-                    _LOGGER.debug("%s: No match on msgid for %s",
-                                  self._name,
-                                  handler.handler.handler_name)
+                if message.get("id") is None or message.get("id") != handler.msgid:
+                    _LOGGER.debug(
+                        "%s: No match on msgid for %s",
+                        self._name,
+                        handler.handler.handler_name,
+                    )
                     continue
 
             if handler.handler.resp_json is not None:
                 if not self._handler_match(
-                        dict_list=handler.handler.resp_json,
-                        message=message):
-                    _LOGGER.debug("%s: No match for handler %s",
-                                  self._name,
-                                  handler.handler.handler_name)
+                    dict_list=handler.handler.resp_json, message=message
+                ):
+                    _LOGGER.debug(
+                        "%s: No match for handler %s",
+                        self._name,
+                        handler.handler.handler_name,
+                    )
                     continue
 
-            _LOGGER.debug("%s: Match for %s",
-                          self._name,
-                          handler.handler.handler_name)
+            _LOGGER.debug("%s: Match for %s", self._name, handler.handler.handler_name)
             callback_list.append(handler)
 
         return callback_list
 
-    def _unregister_expired_handlers(self,
-                                     single_handler: CallbackEntryType =
-                                     None) -> bool:
+    def _unregister_expired_handlers(
+        self, single_handler: CallbackEntryType = None
+    ) -> bool:
         """
         Unregisters any expired handlers based on their expiration
         datetime. Will check the handler dict instead of the list if provided
@@ -256,12 +260,13 @@ class ResponseHandler:
         for handler in handler_list:
             if handler.expiration is not None:
                 if datetime.now(timezone.utc) > handler.expiration:
-                    _LOGGER.debug("%s: Handler %s with UUID %s has "
-                                  "expired, removing: %s",
-                                  self._name,
-                                  handler.handler.handler_name,
-                                  handler.handler_uuid,
-                                  handler.expiration.astimezone())
+                    _LOGGER.debug(
+                        "%s: Handler %s with UUID %s has " "expired, removing: %s",
+                        self._name,
+                        handler.handler.handler_name,
+                        handler.handler_uuid,
+                        handler.expiration.astimezone(),
+                    )
                     self.unregister_handler(handler.handler_uuid)
                     removed_expired = True
 
@@ -281,16 +286,13 @@ class ResponseHandler:
             try:
                 # Wait for something to appear on the queue.
                 message = await self._message_queue.get()
-                _LOGGER.debug("%s: Message received: %s",
-                              self._name,
-                              message)
+                _LOGGER.debug("%s: Message received: %s", self._name, message)
 
                 # Go through list and call
                 for handler in self._get_handlers(message=message):
 
                     # Make sure handler hasn't expired yet.
-                    if self._unregister_expired_handlers(
-                            single_handler=handler):
+                    if self._unregister_expired_handlers(single_handler=handler):
                         # Was expired and now removed, go on with next one.
                         continue
 
@@ -298,7 +300,7 @@ class ResponseHandler:
                         callback_handler=handler.handler.handler_obj,
                         result=message,
                         callback_uuid=handler.handler_uuid,
-                        callback_name=handler.handler.handler_name
+                        callback_name=handler.handler.handler_name,
                     )
 
                     # Remove the handler from the list if it was only to be
@@ -311,23 +313,19 @@ class ResponseHandler:
                 # nothing in the queue.
                 if self._message_queue.empty():
                     # Go through list and remove all expired ones.
-                    _LOGGER.debug("%s: Checking for expired handlers",
-                                  self._name
-                                  )
+                    _LOGGER.debug("%s: Checking for expired handlers", self._name)
                     self._unregister_expired_handlers()
 
             except asyncio.CancelledError:
-                _LOGGER.debug("%s: Received STOP for callback handler",
-                              self._name
-                              )
+                _LOGGER.debug("%s: Received STOP for callback handler", self._name)
                 break
 
             # Need to catch everything here to prevent an issue in a
             # from causing the handler to exit.
             except Exception as exc:
-                _LOGGER.exception("%s: Exception in callback handler: %s",
-                                  self._name,
-                                  exc)
+                _LOGGER.exception(
+                    "%s: Exception in callback handler: %s", self._name, exc
+                )
 
         # Reset the queue.
         self._message_queue = asyncio.Queue()

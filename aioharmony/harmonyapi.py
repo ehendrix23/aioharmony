@@ -11,15 +11,20 @@ Hub.
 """
 
 import asyncio
+from datetime import datetime, timedelta
 import json
 import logging
-from datetime import datetime, timedelta
 from typing import List, Optional, Union
+
 from aioharmony.const import (
-    ClientConfigType, PROTOCOL, SendCommandArg, SendCommandDevice, SendCommandResponse
+    PROTOCOL,
+    ClientConfigType,
+    SendCommandArg,
+    SendCommandDevice,
+    SendCommandResponse,
 )
-from aioharmony.harmonyclient import ClientCallbackType, HarmonyClient
 from aioharmony.handler import Handler
+from aioharmony.harmonyclient import ClientCallbackType, HarmonyClient
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,18 +40,17 @@ SendCommandDevice = SendCommandDevice
 class HarmonyAPI:
 
     # pylint: disable=too-many-arguments
-    def __init__(self,
-                 ip_address: str,
-                 protocol: PROTOCOL = None,
-                 callbacks: ClientCallbackType = None,
-                 loop: asyncio.AbstractEventLoop = None) -> None:
+    def __init__(
+        self,
+        ip_address: str,
+        protocol: PROTOCOL = None,
+        callbacks: ClientCallbackType = None,
+        loop: asyncio.AbstractEventLoop = None,
+    ) -> None:
         _LOGGER.debug("%s: Initialize", ip_address)
         loop = loop if loop else asyncio.get_event_loop()
         self._harmony_client = HarmonyClient(
-            ip_address=ip_address,
-            protocol=protocol,
-            callbacks=callbacks,
-            loop=loop
+            ip_address=ip_address, protocol=protocol, callbacks=callbacks, loop=loop
         )
 
     @property
@@ -67,25 +71,28 @@ class HarmonyAPI:
 
     @property
     def email(self) -> Optional[str]:
-        return self.hub_config.info.get('email')
+        return self.hub_config.info.get("email")
 
     @property
     def account_id(self) -> Optional[str]:
-        return self.hub_config.info.get('accountId')
+        return self.hub_config.info.get("accountId")
 
     @property
     def fw_version(self) -> Optional[str]:
-        return self.hub_config.hub_state.get('hubSwVersion')
+        return self.hub_config.hub_state.get("hubSwVersion")
 
     @property
     def hub_id(self) -> Optional[str]:
-        return self.hub_config.info.get('activeRemoteId')
+        return self.hub_config.info.get("activeRemoteId")
 
     @property
     def current_activity(self) -> tuple:
-        return self._harmony_client.current_activity_id, \
+        return (
+            self._harmony_client.current_activity_id,
             self._harmony_client.get_activity_name(
-                self._harmony_client.current_activity_id)
+                self._harmony_client.current_activity_id
+            ),
+        )
 
     @property
     def config(self) -> dict:
@@ -99,26 +106,23 @@ class HarmonyAPI:
         config = self.config
         activity_dict = {}
 
-        for activity in config.get('activity', []):
-            activity_dict.update({activity['id']: activity['label']})
+        for activity in config.get("activity", []):
+            activity_dict.update({activity["id"]: activity["label"]})
 
         result.update(Activities=activity_dict)
 
         devices_dict = {}
-        for device in config.get('device', []):
+        for device in config.get("device", []):
             command_list = []
-            for control_group in device.get('controlGroup', []):
-                for function in control_group.get('function', []):
-                    action = json.loads(function.get('action'))
+            for control_group in device.get("controlGroup", []):
+                for function in control_group.get("function", []):
+                    action = json.loads(function.get("action"))
                     if action is not None:
-                        command_list.append(action.get('command'))
+                        command_list.append(action.get("command"))
 
-            device_dict = {
-                'id': device.get('id'),
-                'commands': command_list
-            }
+            device_dict = {"id": device.get("id"), "commands": command_list}
 
-            devices_dict.update({device.get('label'): device_dict})
+            devices_dict.update({device.get("label"): device_dict})
 
         result.update(Devices=devices_dict)
 
@@ -133,8 +137,7 @@ class HarmonyAPI:
         self._harmony_client.callbacks = value
 
     def get_activity_id(self, activity_name) -> Optional[str]:
-        return self._harmony_client.get_activity_id(
-            activity_name=activity_name)
+        return self._harmony_client.get_activity_id(activity_name=activity_name)
 
     def get_activity_name(self, activity_id) -> Optional[str]:
         return self._harmony_client.get_activity_name(activity_id=activity_id)
@@ -151,12 +154,12 @@ class HarmonyAPI:
     async def close(self) -> None:
         await self._harmony_client.close()
 
-    def register_handler(self,
-                         handler: Handler,
-                         msgid: str = None,
-                         expiration: Union[
-                             datetime,
-                             timedelta] = None) -> str:
+    def register_handler(
+        self,
+        handler: Handler,
+        msgid: str = None,
+        expiration: Union[datetime, timedelta] = None,
+    ) -> str:
         """Register a handler.
 
         :param handler: Handler object to be registered
@@ -177,12 +180,10 @@ class HarmonyAPI:
         :rtype: str
         """
         return self._harmony_client.register_handler(
-            handler=handler,
-            msgid=msgid,
-            expiration=expiration)
+            handler=handler, msgid=msgid, expiration=expiration
+        )
 
-    def unregister_handler(self,
-                           handler_uuid: str) -> bool:
+    def unregister_handler(self, handler_uuid: str) -> bool:
         """Unregister a handler.
 
         :param handler_uuid: Handler UUID, this is returned by
@@ -192,15 +193,14 @@ class HarmonyAPI:
                  not found
         :rtype: bool
         """
-        return self._harmony_client.unregister_handler(
-            handler_uuid=handler_uuid)
+        return self._harmony_client.unregister_handler(handler_uuid=handler_uuid)
 
     async def sync(self) -> bool:
         """Syncs the harmony hub with the web service."""
         _LOGGER.debug("%s: Performing sync", self.name)
         # Send the command to the HUB
-        response = await self._harmony_client.send_to_hub(command='sync')
-        if not response or response.get('code') != 200:
+        response = await self._harmony_client.send_to_hub(command="sync")
+        if not response or response.get("code") != 200:
             # There was an issue
             return False
 
@@ -209,12 +209,11 @@ class HarmonyAPI:
         return True
 
     async def start_activity(self, activity_id) -> tuple:
-        return await self._harmony_client.start_activity(
-            activity_id=activity_id)
+        return await self._harmony_client.start_activity(activity_id=activity_id)
 
-    async def send_commands(self,
-                            commands: SendCommandArg) -> \
-            List[SendCommandResponse]:
+    async def send_commands(
+        self, commands: SendCommandArg
+    ) -> List[SendCommandResponse]:
 
         if isinstance(commands, list):
             _LOGGER.debug("%s: Sending commands to HUB", self.name)
@@ -242,20 +241,15 @@ class HarmonyAPI:
         :return: True if successfully, False if unsuccessfully
         :rtype: bool
         """
-        _LOGGER.debug("%s: Changing channel to %s",
-                      self.name,
-                      channel)
-        params = {
-            "timestamp": 0,
-            'channel': str(channel)
-        }
+        _LOGGER.debug("%s: Changing channel to %s", self.name, channel)
+        params = {"timestamp": 0, "channel": str(channel)}
 
         # Send the command to the HUB
         response = await self._harmony_client.send_to_hub(
-            command='change_channel',
-            params=params)
+            command="change_channel", params=params
+        )
         if not response:
             # There was an issue
             return False
 
-        return response.get('code') == 200
+        return response.get("code") == 200

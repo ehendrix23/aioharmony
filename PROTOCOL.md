@@ -7,16 +7,13 @@ with the Harmony HUB device.
 
 The Logitech Harmony HUB connects to your home wireless network and obtains an
 IP address. It runs a [Web server](https://en.wikipedia.org/wiki/Web_server) server that listens on port 8088.
- 
 
 ## Authentication
 
 ### Obtaining Remote ID
 
-Each Harmony HUB has a unique hub ID that has to be provided for every request. This ID can be obtained 
+Each Harmony HUB has a unique hub ID that has to be provided for every request. This ID can be obtained
 through the discovery process for Harmony HUBs or by querying a specific HUB itself for it.
-
-
 
 A session token is obtained by logging into the Harmony device with username `guest@x.com` and password
 `guest`. The login process uses the XMPP SASL PLAIN authentication standard

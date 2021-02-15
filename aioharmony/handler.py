@@ -7,8 +7,9 @@ A number of HANDLER constants have been defined here, do not USE these,
 copy them instead.
 
 """
-import re
 from datetime import timedelta
+import re
+
 from aioharmony.const import CallbackType
 
 DEFAULT_TIMEOUT = 60
@@ -55,12 +56,14 @@ class Handler:
     """
 
     # pylint: disable=too-many-arguments
-    def __init__(self,
-                 handler_obj: CallbackType,
-                 handler_name: str = None,
-                 resp_json: dict = None,
-                 once: bool = True,
-                 expiration: timedelta = None) -> None:
+    def __init__(
+        self,
+        handler_obj: CallbackType,
+        handler_name: str = None,
+        resp_json: dict = None,
+        once: bool = True,
+        expiration: timedelta = None,
+    ) -> None:
         self._handler_obj = handler_obj
         self._handler_name = handler_name
         self._resp_json = resp_json
@@ -75,7 +78,7 @@ class Handler:
             handler_name=self._handler_name,
             resp_json=json_resp,
             once=self._once,
-            expiration=self._expiration
+            expiration=self._expiration,
         )
         return new_handler
 
@@ -175,137 +178,125 @@ def dummy_callback(message):
 
 HANDLER_NOTIFY = Handler(
     handler_obj=dummy_callback,
-    handler_name='Notification_Received',
-    resp_json={
-        'type': re.compile(r'^connect\.stateDigest\?notify$')
-    },
-    once=False
+    handler_name="Notification_Received",
+    resp_json={"type": re.compile(r"^connect\.stateDigest\?notify$")},
+    once=False,
 )
 
 HANDLER_START_ACTIVITY_NOTIFY_STARTED = Handler(
     handler_obj=dummy_callback,
-    handler_name='Activity_Starting',
+    handler_name="Activity_Starting",
     resp_json={
-        'type': re.compile(r'^connect\.stateDigest\?notify$'),
-        'data': {
-            'activityStatus': 1,
+        "type": re.compile(r"^connect\.stateDigest\?notify$"),
+        "data": {
+            "activityStatus": 1,
         },
     },
-    once=False
+    once=False,
 )
 
 HANDLER_STOP_ACTIVITY_NOTIFY_STARTED = Handler(
     handler_obj=dummy_callback,
-    handler_name='Activity_Stopping',
+    handler_name="Activity_Stopping",
     resp_json={
-        'type': re.compile(r'^connect\.stateDigest\?notify$'),
-        'data': {
-            'activityStatus': 0,
+        "type": re.compile(r"^connect\.stateDigest\?notify$"),
+        "data": {
+            "activityStatus": 0,
         },
     },
-    once=False
+    once=False,
 )
 
 HANDLER_START_ACTIVITY_NOTIFY_INPROGRESS = Handler(
     handler_obj=dummy_callback,
-    handler_name='Activity_Starting_Inprogress',
+    handler_name="Activity_Starting_Inprogress",
     resp_json={
-        'type': re.compile(r'^connect\.stateDigest\?notify$'),
-        'data': {
-            'activityStatus': 2,
+        "type": re.compile(r"^connect\.stateDigest\?notify$"),
+        "data": {
+            "activityStatus": 2,
         },
     },
-    once=False
+    once=False,
 )
 
 HANDLER_START_ACTIVITY_NOTIFY_STARTED = Handler(
     handler_obj=dummy_callback,
-    handler_name='Activity_Starting',
+    handler_name="Activity_Starting",
     resp_json={
-        'type': re.compile(r'^connect\.stateDigest\?notify$'),
-        'data': {
-            'activityStatus': 1,
+        "type": re.compile(r"^connect\.stateDigest\?notify$"),
+        "data": {
+            "activityStatus": 1,
         },
     },
-    once=False
+    once=False,
 )
 
 HANDLER_STOP_ACTIVITY_NOTIFY_STARTED = Handler(
     handler_obj=dummy_callback,
-    handler_name='Activity_Stopping',
+    handler_name="Activity_Stopping",
     resp_json={
-        'type': re.compile(r'^connect\.stateDigest\?notify$'),
-        'data': {
-            'activityStatus': 0,
+        "type": re.compile(r"^connect\.stateDigest\?notify$"),
+        "data": {
+            "activityStatus": 0,
         },
     },
-    once=False
+    once=False,
 )
 
 HANDLER_START_ACTIVITY_NOTIFY_INPROGRESS = Handler(
     handler_obj=dummy_callback,
-    handler_name='Activity_Starting_Inprogress',
+    handler_name="Activity_Starting_Inprogress",
     resp_json={
-        'type': re.compile(r'^connect\.stateDigest\?notify$'),
-        'data': {
-            'activityStatus': 2,
+        "type": re.compile(r"^connect\.stateDigest\?notify$"),
+        "data": {
+            "activityStatus": 2,
         },
     },
-    once=False
+    once=False,
 )
 
 HANDLER_START_ACTIVITY_FINISHED = Handler(
     handler_obj=dummy_callback,
-    handler_name='Activity_Changed',
-    resp_json={
-        'type': re.compile(r'^harmony\.engine\?startActivityFinished$')
-    },
-    once=False
+    handler_name="Activity_Changed",
+    resp_json={"type": re.compile(r"^harmony\.engine\?startActivityFinished$")},
+    once=False,
 )
 
 HANDLER_RUN_ACTIVITY = Handler(
     handler_obj=dummy_callback,
-    handler_name='runactivity',
-    resp_json={
-        'cmd': re.compile(r'^harmony\.activityengine\?runactivity$')
-    },
+    handler_name="runactivity",
+    resp_json={"cmd": re.compile(r"^harmony\.activityengine\?runactivity$")},
     once=False,
-    expiration=timedelta(seconds=DEFAULT_TIMEOUT * 5)
+    expiration=timedelta(seconds=DEFAULT_TIMEOUT * 5),
 )
 
 HANDLER_START_ACTIVITY_IN_PROGRESS = Handler(
     handler_obj=dummy_callback,
-    handler_name='progress_startactivity',
-    resp_json={
-        'cmd':  re.compile(r'^harmony\.engine\?startActivity$'),
-        'code': 100
-    },
+    handler_name="progress_startactivity",
+    resp_json={"cmd": re.compile(r"^harmony\.engine\?startActivity$"), "code": 100},
     once=False,
-    expiration=timedelta(seconds=DEFAULT_TIMEOUT * 5)
+    expiration=timedelta(seconds=DEFAULT_TIMEOUT * 5),
 )
 
 HANDLER_HELPDISCRETES = Handler(
     handler_obj=dummy_callback,
-    handler_name='progress_discrete',
+    handler_name="progress_discrete",
     resp_json={
-        'cmd':  re.compile(r'^harmony\.engine\?helpdiscretes$'),
-        'data': {
-            'isHelpDiscretes': 'true'
-        }
+        "cmd": re.compile(r"^harmony\.engine\?helpdiscretes$"),
+        "data": {"isHelpDiscretes": "true"},
     },
     once=False,
-    expiration=timedelta(seconds=DEFAULT_TIMEOUT * 5)
+    expiration=timedelta(seconds=DEFAULT_TIMEOUT * 5),
 )
 
 HANDLER_START_ACTIVITY_COMPLETE = Handler(
     handler_obj=dummy_callback,
-    handler_name='startactivity_or_discrete',
+    handler_name="startactivity_or_discrete",
     resp_json={
-        'cmd': re.compile(
-            r'(^harmony\.engine\?helpdiscretes$)|'
-            r'(^harmony\.engine\?startActivity$)'
+        "cmd": re.compile(
+            r"(^harmony\.engine\?helpdiscretes$)|" r"(^harmony\.engine\?startActivity$)"
         )
     },
     once=False,
-    expiration=timedelta(seconds=DEFAULT_TIMEOUT * 5)
+    expiration=timedelta(seconds=DEFAULT_TIMEOUT * 5),
 )

@@ -5,9 +5,9 @@
 responses."""
 
 import asyncio
+from contextlib import suppress
 import logging
 import socket
-from contextlib import suppress
 from typing import Optional, Union
 from urllib.parse import urlparse
 from uuid import uuid4
@@ -16,12 +16,12 @@ import aiohttp
 from async_timeout import timeout
 
 from aioharmony.const import (
+    DEFAULT_WS_HUB_PORT as DEFAULT_HUB_PORT,
     ConnectorCallbackType,
-    DEFAULT_WS_HUB_PORT as DEFAULT_HUB_PORT
 )
 from aioharmony.helpers import call_callback
 
-DEFAULT_DOMAIN = 'svcs.myharmony.com'
+DEFAULT_DOMAIN = "svcs.myharmony.com"
 DEFAULT_TIMEOUT = 5
 
 _LOGGER = logging.getLogger(__name__)
@@ -35,15 +35,18 @@ _LOGGER = logging.getLogger(__name__)
 class HubConnector:
     """An websocket client for connecting to the Logitech Harmony devices."""
 
-    def __init__(self,
-                 ip_address: str,
-                 response_queue: asyncio.Queue,
-                 callbacks: ConnectorCallbackType = None,
-                 auto_reconnect=True) -> None:
+    def __init__(
+        self,
+        ip_address: str,
+        response_queue: asyncio.Queue,
+        callbacks: ConnectorCallbackType = None,
+        auto_reconnect=True,
+    ) -> None:
         self._ip_address = ip_address
         self._response_queue = response_queue
-        self._callbacks = callbacks if callbacks is not None else \
-            ConnectorCallbackType(None, None)
+        self._callbacks = (
+            callbacks if callbacks is not None else ConnectorCallbackType(None, None)
+        )
         self._auto_reconnect = auto_reconnect
 
         self._remote_id = None
@@ -71,8 +74,8 @@ class HubConnector:
     async def close(self):
         """Close all connections and tasks
 
-           This should be called to ensure everything is stopped and
-           cancelled out.
+        This should be called to ensure everything is stopped and
+        cancelled out.
         """
         # Close connections.
         await self.hub_disconnect()
@@ -93,8 +96,9 @@ class HubConnector:
         )
 
         session_timeout = aiohttp.ClientTimeout(connect=DEFAULT_TIMEOUT)
-        self._aiohttp_session = aiohttp.ClientSession(connector=conn,
-                                                      timeout=session_timeout)
+        self._aiohttp_session = aiohttp.ClientSession(
+            connector=conn, timeout=session_timeout
+        )
         return self._aiohttp_session
 
     async def _get_remote_id(self) -> Optional[str]:
@@ -104,10 +108,9 @@ class HubConnector:
             # We do not have the remoteId yet, get it first.
             response = await self._retrieve_hub_info()
             if response is not None:
-                self._remote_id = response.get('activeRemoteId')
-                domain = urlparse(response.get('discoveryServer'))
-                self._domain = domain.netloc if domain.netloc else \
-                    DEFAULT_DOMAIN
+                self._remote_id = response.get("activeRemoteId")
+                domain = urlparse(response.get("discoveryServer"))
+                self._domain = domain.netloc if domain.netloc else DEFAULT_DOMAIN
         return self._remote_id
 
     async def hub_connect(self, is_reconnect: bool = False) -> bool:
@@ -130,63 +133,74 @@ class HubConnector:
 
             if await self._get_remote_id() is None:
                 # No remote ID means no connect.
-                _LOGGER.log(log_level,
-                            "%s: Unable to retrieve HUB id",
-                            self._ip_address)
+                _LOGGER.log(
+                    log_level, "%s: Unable to retrieve HUB id", self._ip_address
+                )
                 return False
 
-            _LOGGER.debug("%s: Connecting for hub %s", self._ip_address,
-                          self._remote_id)
+            _LOGGER.debug(
+                "%s: Connecting for hub %s", self._ip_address, self._remote_id
+            )
             try:
                 self._websocket = await self._session.ws_connect(
-                    'ws://{}:{}/?domain={}&hubId={}'.format(
+                    "ws://{}:{}/?domain={}&hubId={}".format(
                         self._ip_address,
                         DEFAULT_HUB_PORT,
                         self._domain,
-                        self._remote_id
+                        self._remote_id,
                     ),
-                    heartbeat=10
+                    heartbeat=10,
                 )
-            except (aiohttp.ServerTimeoutError, aiohttp.ClientError,
-                    aiohttp.WSServerHandshakeError) as exc:
+            except (
+                aiohttp.ServerTimeoutError,
+                aiohttp.ClientError,
+                aiohttp.WSServerHandshakeError,
+            ) as exc:
                 if isinstance(exc, aiohttp.ServerTimeoutError):
-                    _LOGGER.log(log_level,
-                                "%s: Connection timed out for hub %s",
-                                self._ip_address,
-                                self._remote_id)
+                    _LOGGER.log(
+                        log_level,
+                        "%s: Connection timed out for hub %s",
+                        self._ip_address,
+                        self._remote_id,
+                    )
                 elif isinstance(exc, aiohttp.ClientError):
-                    _LOGGER.log(log_level,
-                                "%s: Exception trying to establish web "
-                                "socket connection for hub %s: %s",
-                                self._ip_address,
-                                self._remote_id,
-                                exc)
+                    _LOGGER.log(
+                        log_level,
+                        "%s: Exception trying to establish web "
+                        "socket connection for hub %s: %s",
+                        self._ip_address,
+                        self._remote_id,
+                        exc,
+                    )
                 else:
-                    _LOGGER.log(log_level,
-                                "%s: Invalid status code %s received "
-                                "trying to connect for hub %s: %s",
-                                self._ip_address,
-                                exc.status,
-                                self._remote_id,
-                                exc)
+                    _LOGGER.log(
+                        log_level,
+                        "%s: Invalid status code %s received "
+                        "trying to connect for hub %s: %s",
+                        self._ip_address,
+                        exc.status,
+                        self._remote_id,
+                        exc,
+                    )
                 self._websocket = None
                 return False
 
             # Now put the listener on the loop.
             if not self._listener_task:
                 self._listener_task = asyncio.ensure_future(
-                    self._listener(self._websocket))
+                    self._listener(self._websocket)
+                )
 
             # Set connected to True, disconnect sets this to False to
             # prevent automatic reconnect when disconnect is explicitly called
             self._connected = True
-            call_callback(callback_handler=self._callbacks.connect,
-                          result=self._ip_address,
-                          callback_uuid=self._ip_address,
-                          callback_name='connected'
-                          )
-            _LOGGER.debug("%s: Connected to hub %s", self._ip_address,
-                          self._remote_id)
+            call_callback(
+                callback_handler=self._callbacks.connect,
+                result=self._ip_address,
+                callback_uuid=self._ip_address,
+                callback_name="connected",
+            )
+            _LOGGER.debug("%s: Connected to hub %s", self._ip_address, self._remote_id)
             return True
 
     async def hub_disconnect(self) -> None:
@@ -216,38 +230,39 @@ class HubConnector:
 
     async def _reconnect(self) -> None:
         """Perform reconnect to HUB if connection failed"""
-        call_callback(callback_handler=self._callbacks.disconnect,
-                      result=self._ip_address,
-                      callback_uuid=self._ip_address,
-                      callback_name='disconnected'
-                      )
+        call_callback(
+            callback_handler=self._callbacks.disconnect,
+            result=self._ip_address,
+            callback_uuid=self._ip_address,
+            callback_name="disconnected",
+        )
         if not self._connected:
-            _LOGGER.debug("%s: Connection was closed through "
-                          "disconnect, not reconnecting",
-                          self._ip_address)
+            _LOGGER.debug(
+                "%s: Connection was closed through " "disconnect, not reconnecting",
+                self._ip_address,
+            )
             return
 
         if not self._auto_reconnect:
-            _LOGGER.debug("%s: Connection closed, auto-reconnect disabled",
-                          self._ip_address)
+            _LOGGER.debug(
+                "%s: Connection closed, auto-reconnect disabled", self._ip_address
+            )
             return
 
-        _LOGGER.debug("%s: Connection closed, reconnecting",
-                      self._ip_address)
+        _LOGGER.debug("%s: Connection closed, reconnecting", self._ip_address)
 
         async with self._connect_disconnect_lock:
             # It is possible that the web socket hasn't been closed yet,
             # if this is the case then close it now.
             if self._websocket is not None and not self._websocket.closed:
-                _LOGGER.debug("%s: Web Socket half-closed, closing first",
-                              self._ip_address)
+                _LOGGER.debug(
+                    "%s: Web Socket half-closed, closing first", self._ip_address
+                )
                 with suppress(asyncio.TimeoutError), timeout(DEFAULT_TIMEOUT):
                     await self._websocket.close()
 
-            if self._aiohttp_session is not None and not \
-                    self._aiohttp_session.closed:
-                _LOGGER.debug("%s: Closing sessions",
-                              self._ip_address)
+            if self._aiohttp_session is not None and not self._aiohttp_session.closed:
+                _LOGGER.debug("%s: Closing sessions", self._ip_address)
                 with suppress(asyncio.TimeoutError), timeout(DEFAULT_TIMEOUT):
                     await self._aiohttp_session.close()
 
@@ -265,26 +280,23 @@ class HubConnector:
             sleep_time = min(sleep_time, 30)
             is_reconnect = True
 
-    async def hub_send(self, command, params, msgid=None, post=False) -> \
-            Optional[Union[str, dict]]:
+    async def hub_send(
+        self, command, params, msgid=None, post=False
+    ) -> Optional[Union[str, dict]]:
         """Send a payload request to Harmony Hub and return json response."""
 
         if not msgid:
             msgid = str(uuid4())
 
         if post:
-            url = 'http://{}:{}/'.format(self._ip_address, DEFAULT_HUB_PORT)
+            url = "http://{}:{}/".format(self._ip_address, DEFAULT_HUB_PORT)
             headers = {
-                'Origin': 'http://sl.dhg.myharmony.com',
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Accept-Charset': 'utf-8',
+                "Origin": "http://sl.dhg.myharmony.com",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Accept-Charset": "utf-8",
             }
-            json_request = {
-                "id ": msgid,
-                "cmd": command,
-                "params": {}
-            }
+            json_request = {"id ": msgid, "cmd": command, "params": {}}
             response = asyncio.ensure_future(self.hub_post(url, json_request, headers))
             return response
 
@@ -295,36 +307,27 @@ class HubConnector:
         payload = {
             "hubId": self._remote_id,
             "timeout": DEFAULT_TIMEOUT,
-            "hbus": {
-                "cmd": command,
-                "id": msgid,
-                "params": params
-            }
+            "hbus": {"cmd": command, "id": msgid, "params": params},
         }
 
         _LOGGER.debug("%s: Sending payload: %s", self._ip_address, payload)
         try:
             await self._websocket.send_json(payload)
         except aiohttp.ClientError as exc:
-            _LOGGER.error("%s: Exception sending payload: %s",
-                          self._ip_address, exc)
+            _LOGGER.error("%s: Exception sending payload: %s", self._ip_address, exc)
             return
 
         return msgid
 
-    async def hub_post(self, url, json_request, headers=None) -> \
-            Optional[dict]:
+    async def hub_post(self, url, json_request, headers=None) -> Optional[dict]:
         """Post a json request and return the response."""
-        _LOGGER.debug("%s: Sending post request: %s",
-                      self._ip_address,
-                      json_request)
+        _LOGGER.debug("%s: Sending post request: %s", self._ip_address, json_request)
         try:
             async with self._session.post(
-                    url, json=json_request, headers=headers) as response:
+                url, json=json_request, headers=headers
+            ) as response:
                 json_response = await response.json(content_type=None)
-                _LOGGER.debug("%s: Post response: %s",
-                              self._ip_address,
-                              json_response)
+                _LOGGER.debug("%s: Post response: %s", self._ip_address, json_response)
         except aiohttp.ClientError as exc:
             _LOGGER.error("%s: Exception on post: %s", self._ip_address, exc)
         else:
@@ -355,18 +358,24 @@ class HubConnector:
                 try:
                     response = await websocket.receive()
                 except aiohttp.ClientError as exc:
-                    _LOGGER.error("%s: Exception during receive: %s",
-                                  self._ip_address, exc)
+                    _LOGGER.error(
+                        "%s: Exception during receive: %s", self._ip_address, exc
+                    )
                     break
 
-                _LOGGER.debug("%s: Response payload: %s", self._ip_address,
-                              response.data)
+                _LOGGER.debug(
+                    "%s: Response payload: %s", self._ip_address, response.data
+                )
 
                 if response.type == aiohttp.WSMsgType.CLOSED:
-                    close_code = '' if response.data is None else 'with code ' + \
-                                                                  aiohttp.WSCloseCode(response.data).name
-                    _LOGGER.debug("%s: Web socket closed %s",
-                                  self._ip_address, close_code)
+                    close_code = (
+                        ""
+                        if response.data is None
+                        else "with code " + aiohttp.WSCloseCode(response.data).name
+                    )
+                    _LOGGER.debug(
+                        "%s: Web socket closed %s", self._ip_address, close_code
+                    )
                     # Issue reconnect event if enabled
                     have_connection = False
                     break
@@ -386,16 +395,16 @@ class HubConnector:
                 self._response_queue.put_nowait(response_json)
 
             except asyncio.CancelledError:
-                _LOGGER.debug("%s: Received STOP for listener",
-                              self._ip_address)
+                _LOGGER.debug("%s: Received STOP for listener", self._ip_address)
                 break
 
             # pylint: disable=broad-except
             # Need to catch everything here to prevent an issue in a
             # callback from ever causing the handler to exit.
             except Exception as exc:
-                _LOGGER.exception("%s: Exception in listener: %s",
-                                  self._ip_address, exc)
+                _LOGGER.exception(
+                    "%s: Exception in listener: %s", self._ip_address, exc
+                )
 
         self._listener_task = None
         _LOGGER.debug("%s: Listener stopped.", self._ip_address)
@@ -407,26 +416,20 @@ class HubConnector:
 
     async def _retrieve_hub_info(self) -> Optional[dict]:
         """Retrieve the harmony Hub information."""
-        _LOGGER.debug("%s: Retrieving Harmony Hub information.",
-                      self._ip_address)
+        _LOGGER.debug("%s: Retrieving Harmony Hub information.", self._ip_address)
 
-
-        url = 'http://{}:{}/'.format(self._ip_address, DEFAULT_HUB_PORT)
+        url = "http://{}:{}/".format(self._ip_address, DEFAULT_HUB_PORT)
         headers = {
-            'Origin': 'http://sl.dhg.myharmony.com',
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Accept-Charset': 'utf-8',
+            "Origin": "http://sl.dhg.myharmony.com",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Accept-Charset": "utf-8",
         }
-        json_request = {
-            "id ": 1,
-            "cmd": "setup.account?getProvisionInfo",
-            "params": {}
-        }
+        json_request = {"id ": 1, "cmd": "setup.account?getProvisionInfo", "params": {}}
 
         response = await self.hub_post(url, json_request, headers)
 
         if response is not None:
-            return response.get('data')
+            return response.get("data")
 
         return None
