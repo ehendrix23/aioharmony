@@ -23,6 +23,13 @@
         "-1",
         "activity_monitor"
       ]
+    },
+    {
+      "name": "Python: aioharmony family room listen",
+      "type": "python",
+      "request": "launch",
+      "module": "aioharmony",
+      "args": ["--harmony_ip", "192.168.1.20", "--wait", "-1", "listen"]
     }
   ]
 }
