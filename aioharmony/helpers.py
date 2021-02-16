@@ -18,8 +18,8 @@ _LOGGER = logging.getLogger(__name__)
 def call_callback(
     callback_handler: CallbackType,
     result: object,
-    callback_uuid: str,
-    callback_name: str,
+    callback_uuid: str = None,
+    callback_name: str = None,
 ) -> bool:
     # If we were provided a callback handler then call it now.
     if callback_handler is None:
@@ -79,7 +79,7 @@ def call_raw_callback(
     if asyncio.isfuture(callback):
         # It is a future, set the result of the future to
         # the message.
-        if callback.done():
+        if callback.done():  # type: ignore
             _LOGGER.debug(
                 "Result of future %s with UUID %s was already " "set",
                 callback_name,
@@ -87,7 +87,7 @@ def call_raw_callback(
             )
         else:
             _LOGGER.debug("Future %s with UUID %s is set", callback_name, callback_uuid)
-            callback.set_result(result)
+            callback.set_result(result)  # type: ignore
 
         return True
 
@@ -99,12 +99,12 @@ def call_raw_callback(
         callback.set()
         return True
 
-    if asyncio.iscoroutinefunction(callback):
+    if asyncio.iscoroutinefunction(callback):  # type: ignore
         # Is a coroutine, schedule it on the loop.
         _LOGGER.debug(
             "Scheduling coroutine %s with UUID %s", callback_name, callback_uuid
         )
-        partial_func = partial(callback, result)
+        partial_func = partial(callback, result)  # type: ignore
         partial_coro = asyncio.coroutine(partial_func)
         asyncio.ensure_future(partial_coro())
         return True

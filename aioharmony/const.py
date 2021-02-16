@@ -5,7 +5,7 @@ Constants used throughout the modules
 """
 
 import asyncio
-from typing import Any, Callable, List, NamedTuple, Optional, Union
+from typing import Any, Callable, List, Literal, NamedTuple, Optional, Union
 
 #
 # DEFAULT values
@@ -19,7 +19,7 @@ DEFAULT_HARMONY_MIME = "vnd.logitech.harmony/vnd.logitech.harmony.engine"
 WEBSOCKETS = "WEBSOCKETS"
 XMPP = "XMPP"
 
-PROTOCOL = Union[WEBSOCKETS, XMPP]
+PROTOCOL = Union[Literal["WEBSOCKETS"], Literal["XMPP"]]
 
 #
 # The HUB commands that can be send
@@ -48,7 +48,9 @@ HUB_COMMANDS = {
 
 # Type for callback parameters
 CallbackType = Union[
-    asyncio.Future, asyncio.Event, Callable[[object, Optional[Any]], Any]
+    asyncio.Future,
+    asyncio.Event,
+    Callable[[Any], Any],
 ]
 
 ClientCallbackType = NamedTuple(

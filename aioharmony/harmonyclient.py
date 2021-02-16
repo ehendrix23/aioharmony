@@ -108,7 +108,7 @@ class HarmonyClient:
         return self._ip_address
 
     @property
-    def protocol(self) -> str:
+    def protocol(self) -> Optional[str]:
         return self._protocol
 
     @property
@@ -275,7 +275,7 @@ class HarmonyClient:
             try:
                 with timeout(DEFAULT_TIMEOUT):
                     await self._hub_connection.close()
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 _LOGGER.debug("%s: Exception occurred during disconnection.", self.name)
                 raise_exception = e
                 if isinstance(raise_exception, asyncio.TimeoutError):
@@ -355,13 +355,13 @@ class HarmonyClient:
         try:
             with timeout(DEFAULT_TIMEOUT / 2):
                 response = await self.send_to_hub(
-                    command="get_config", send_timeout=DEFAULT_TIMEOUT / 4
+                    command="get_config", send_timeout=int(DEFAULT_TIMEOUT / 4)
                 )
         except (asyncio.TimeoutError, aioexc.TimeOut):
             try:
                 with timeout(DEFAULT_TIMEOUT / 2):
                     response = await self.send_to_hub(
-                        command="get_config", send_timeout=DEFAULT_TIMEOUT / 4
+                        command="get_config", send_timeout=int(DEFAULT_TIMEOUT / 4)
                     )
             except (asyncio.TimeoutError, aioexc.TimeOut):
                 raise aioexc.TimeOut
@@ -370,6 +370,10 @@ class HarmonyClient:
             # There was an issue
             return None
 
+        if not isinstance(response, dict):
+            raise aioexc.HarmonyException(
+                f"Expecting dictionary but received {type(response)}"
+            )
         if response.get("code") != 200:
             _LOGGER.error(
                 "%s: Incorrect status code %s received trying to "
@@ -415,7 +419,7 @@ class HarmonyClient:
                 result = await self.send_to_hub(
                     command="provision_info",
                     post=True,
-                    send_timeout=DEFAULT_TIMEOUT / 4,
+                    send_timeout=int(DEFAULT_TIMEOUT / 4),
                 )
         except (asyncio.TimeoutError, aioexc.TimeOut):
             try:
@@ -427,7 +431,7 @@ class HarmonyClient:
                     result = await self.send_to_hub(
                         command="provision_info",
                         post=True,
-                        send_timeout=DEFAULT_TIMEOUT / 4,
+                        send_timeout=int(DEFAULT_TIMEOUT / 4),
                     )
             except (asyncio.TimeoutError, aioexc.TimeOut):
                 _LOGGER.error(
@@ -435,6 +439,11 @@ class HarmonyClient:
                 )
 
         if result is not None:
+            if not isinstance(result, dict):
+                raise aioexc.HarmonyException(
+                    f"Expecting dictionary but received {type(result)}"
+                )
+
             if result.get("code") != 200 and result.get("code") != "200":
                 _LOGGER.error(
                     "%s: Incorrect status code %s received trying to "
@@ -455,7 +464,9 @@ class HarmonyClient:
         try:
             with timeout(DEFAULT_TIMEOUT / 2):
                 result = await self.send_to_hub(
-                    command="discovery", post=False, send_timeout=DEFAULT_TIMEOUT / 4
+                    command="discovery",
+                    post=False,
+                    send_timeout=int(DEFAULT_TIMEOUT / 4),
                 )
         except (asyncio.TimeoutError, aioexc.TimeOut):
             try:
@@ -466,7 +477,7 @@ class HarmonyClient:
                     result = await self.send_to_hub(
                         command="discovery",
                         post=False,
-                        send_timeout=DEFAULT_TIMEOUT / 4,
+                        send_timeout=int(DEFAULT_TIMEOUT / 4),
                     )
             except (asyncio.TimeoutError, aioexc.TimeOut):
                 _LOGGER.error(
@@ -474,6 +485,11 @@ class HarmonyClient:
                 )
 
         if result is not None:
+            if not isinstance(result, dict):
+                raise aioexc.HarmonyException(
+                    f"Expecting dictionary but received {type(result)}"
+                )
+
             if result.get("code") != 200 and result.get("code") != "200":
                 _LOGGER.error(
                     "%s: Incorrect status code %s received trying to "
@@ -499,11 +515,11 @@ class HarmonyClient:
             return_exceptions=True,
         )
         for idx, result in enumerate(results):
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 raise result
 
             if idx == 0:
-                response = result
+                response = result  # type: Optional[dict]
 
         return response
 
@@ -554,10 +570,15 @@ class HarmonyClient:
                 self.unregister_handler(handler_uuid=handler_uuid)
             raise aioexc.TimeOut
 
-        if asyncio.isfuture(send_response):
-            response = send_response
-        elif not wait:
-            return True
+        # If response is None then we would only wait if we received a future back from hub_send.
+        if response is None:
+            # If the response received a future? isinstance check is added for typing, Python 3.9
+            # might make it so we can use isinstance(Future) instead?
+            if asyncio.isfuture(send_response) and not isinstance(send_response, str):
+                response = send_response
+            else:
+                # Return True if not waiting for response.
+                return True
 
         # Wait for the response to be available.
         try:
@@ -578,7 +599,8 @@ class HarmonyClient:
         try:
             with timeout(DEFAULT_TIMEOUT / 2):
                 response = await self.send_to_hub(
-                    command="get_current_activity", send_timeout=DEFAULT_TIMEOUT / 4
+                    command="get_current_activity",
+                    send_timeout=int(DEFAULT_TIMEOUT / 4),
                 )
         except (asyncio.TimeoutError, aioexc.TimeOut):
             _LOGGER.debug(
@@ -587,7 +609,8 @@ class HarmonyClient:
             try:
                 with timeout(DEFAULT_TIMEOUT / 2):
                     response = await self.send_to_hub(
-                        command="get_current_activity", send_timeout=DEFAULT_TIMEOUT / 4
+                        command="get_current_activity",
+                        send_timeout=int(DEFAULT_TIMEOUT / 4),
                     )
             except (asyncio.TimeoutError, aioexc.TimeOut):
                 _LOGGER.error(
@@ -598,6 +621,11 @@ class HarmonyClient:
         if not response:
             # There was an issue
             return False
+
+        if not isinstance(response, dict):
+            raise aioexc.HarmonyException(
+                f"Expecting dictionary but received {type(response)}"
+            )
 
         if response.get("code") != 200:
             _LOGGER.error(
@@ -663,8 +691,7 @@ class HarmonyClient:
                 # Get all the HUB information.
                 await self.refresh_info_from_hub()
 
-    # pylint: disable=broad-except
-    async def _update_activity_callback(self, message: dict = None) -> None:
+    async def _update_activity_callback(self, message: dict) -> None:
         """Update current activity when changed."""
         _LOGGER.debug("%s: New activity was started", self.name)
 
@@ -699,7 +726,7 @@ class HarmonyClient:
             )
 
     # pylint: disable=broad-except
-    async def _update_start_activity_callback(self, message: dict = None) -> None:
+    async def _update_start_activity_callback(self, message: dict) -> None:
         """Update current activity when changed."""
         _LOGGER.debug("%s: New activity starting notification", self.name)
 

@@ -58,7 +58,7 @@ class HarmonyAPI:
         return self._harmony_client.ip_address
 
     @property
-    def protocol(self) -> str:
+    def protocol(self) -> Optional[str]:
         return self._harmony_client.protocol
 
     @property
@@ -136,13 +136,13 @@ class HarmonyAPI:
     def callbacks(self, value: ClientCallbackType) -> None:
         self._harmony_client.callbacks = value
 
-    def get_activity_id(self, activity_name) -> Optional[str]:
+    def get_activity_id(self, activity_name) -> Optional[int]:
         return self._harmony_client.get_activity_id(activity_name=activity_name)
 
     def get_activity_name(self, activity_id) -> Optional[str]:
         return self._harmony_client.get_activity_name(activity_id=activity_id)
 
-    def get_device_id(self, device_name) -> Optional[str]:
+    def get_device_id(self, device_name) -> Optional[int]:
         return self._harmony_client.get_device_id(device_name=device_name)
 
     def get_device_name(self, device_id) -> Optional[str]:
@@ -200,7 +200,7 @@ class HarmonyAPI:
         _LOGGER.debug("%s: Performing sync", self.name)
         # Send the command to the HUB
         response = await self._harmony_client.send_to_hub(command="sync")
-        if not response or response.get("code") != 200:
+        if not response or (isinstance(response, dict) and response.get("code") != 200):
             # There was an issue
             return False
 
@@ -252,4 +252,7 @@ class HarmonyAPI:
             # There was an issue
             return False
 
-        return response.get("code") == 200
+        if isinstance(response, dict):
+            response = response.get("code") == 200
+
+        return response

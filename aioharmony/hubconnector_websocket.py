@@ -95,7 +95,7 @@ class HubConnector:
             enable_cleanup_closed=True,
         )
 
-        session_timeout = aiohttp.ClientTimeout(connect=DEFAULT_TIMEOUT)
+        session_timeout = aiohttp.ClientTimeout(connect=DEFAULT_TIMEOUT)  # type: ignore
         self._aiohttp_session = aiohttp.ClientSession(
             connector=conn, timeout=session_timeout
         )
@@ -194,12 +194,16 @@ class HubConnector:
             # Set connected to True, disconnect sets this to False to
             # prevent automatic reconnect when disconnect is explicitly called
             self._connected = True
-            call_callback(
-                callback_handler=self._callbacks.connect,
-                result=self._ip_address,
-                callback_uuid=self._ip_address,
-                callback_name="connected",
-            )
+            if self._callbacks.connect:
+                call_callback(
+                    callback_handler=self._callbacks.connect,
+                    result=self._ip_address,
+                    callback_uuid=self._ip_address,
+                    callback_name="connected",
+                )
+            else:
+                _LOGGER.debug("No connect callback handler provided")
+
             _LOGGER.debug("%s: Connected to hub %s", self._ip_address, self._remote_id)
             return True
 
@@ -230,12 +234,16 @@ class HubConnector:
 
     async def _reconnect(self) -> None:
         """Perform reconnect to HUB if connection failed"""
-        call_callback(
-            callback_handler=self._callbacks.disconnect,
-            result=self._ip_address,
-            callback_uuid=self._ip_address,
-            callback_name="disconnected",
-        )
+        if self._callbacks.disconnect:
+            call_callback(
+                callback_handler=self._callbacks.disconnect,
+                result=self._ip_address,
+                callback_uuid=self._ip_address,
+                callback_name="disconnected",
+            )
+        else:
+            _LOGGER.debug("No disconnect callback handler provided")
+
         if not self._connected:
             _LOGGER.debug(
                 "%s: Connection was closed through " "disconnect, not reconnecting",
@@ -282,7 +290,7 @@ class HubConnector:
 
     async def hub_send(
         self, command, params, msgid=None, post=False
-    ) -> Optional[Union[str, dict]]:
+    ) -> Optional[Union[asyncio.Future, str]]:
         """Send a payload request to Harmony Hub and return json response."""
 
         if not msgid:

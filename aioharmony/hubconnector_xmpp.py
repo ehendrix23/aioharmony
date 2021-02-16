@@ -271,21 +271,28 @@ class HubConnector(slixmpp.ClientXMPP):
     def _connected_handler(self, _) -> None:
         """Call handler for connection."""
         self._connected = True
-        call_callback(
-            callback_handler=self._callbacks.connect,
-            result=self._ip_address,
-            callback_uuid=self._ip_address,
-            callback_name="connected",
-        )
+        if self._callbacks.connect:
+            call_callback(
+                callback_handler=self._callbacks.connect,
+                result=self._ip_address,
+                callback_uuid=self._ip_address,
+                callback_name="connected",
+            )
+        else:
+            _LOGGER.debug("No connect callback handler provided")
 
     async def _disconnected_handler(self, _) -> None:
         """Perform reconnect to HUB if connection failed"""
-        call_callback(
-            callback_handler=self._callbacks.disconnect,
-            result=self._ip_address,
-            callback_uuid=self._ip_address,
-            callback_name="disconnected",
-        )
+        if self._callbacks.disconnect:
+            call_callback(
+                callback_handler=self._callbacks.disconnect,
+                result=self._ip_address,
+                callback_uuid=self._ip_address,
+                callback_name="disconnected",
+            )
+        else:
+            _LOGGER.debug("No disconnect callback handler provided")
+
         if not self._connected:
             _LOGGER.debug(
                 "%s: Connection was closed through " "disconnect, not reconnecting",
@@ -387,7 +394,6 @@ class HubConnector(slixmpp.ClientXMPP):
                 _LOGGER.error(
                     "%s: Invalid payload length of 0 received.",
                     self._ip_address,
-                    len(payload),
                 )
                 return
 

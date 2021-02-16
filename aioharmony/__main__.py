@@ -525,7 +525,7 @@ async def run():
             hub_tasks.append(asyncio.ensure_future(execute_per_hub(hub, args)))
 
         results = await asyncio.gather(*hub_tasks, return_exceptions=True)
-        for idx, result in enumerate(results):
+        for _, result in enumerate(results):
             if isinstance(result, Exception):
                 raise result
 
@@ -537,7 +537,7 @@ def cancel_tasks(loop):
         task.cancel()
 
     # Allow cancellations to be processed
-    for x in range(10):
+    for _ in range(10):
         loop.run_until_complete(asyncio.sleep(1))
         if len(asyncio.all_tasks(loop)) == 0:
             break

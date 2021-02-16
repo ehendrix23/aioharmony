@@ -9,6 +9,7 @@ copy them instead.
 """
 from datetime import timedelta
 import re
+from typing import Optional
 
 from aioharmony.const import CallbackType
 
@@ -71,8 +72,12 @@ class Handler:
         self._expiration = expiration
 
     def __copy__(self):
-        json_resp = dict()
-        json_resp.update(self._resp_json)
+        if self._resp_json is None:
+            json_resp = None
+        else:
+            json_resp = dict()
+            json_resp.update(self._resp_json)
+
         new_handler = Handler(
             handler_obj=self._handler_obj,
             handler_name=self._handler_name,
@@ -86,8 +91,6 @@ class Handler:
     def handler_obj(self) -> CallbackType:
         """
 
-        :param value: New handler_obj
-        :type value: CallbackType
         :return: Returns handler_obj
         :rtype: CallbackType
         """
@@ -95,11 +98,15 @@ class Handler:
 
     @handler_obj.setter
     def handler_obj(self, value: CallbackType) -> None:
-        """"""
+        """Update handler_obj (callback routine)
+
+        Args:
+            value (CallbackType): Method, Event, Future to call
+        """
         self._handler_obj = value
 
     @property
-    def handler_name(self) -> str:
+    def handler_name(self) -> Optional[str]:
         """
 
         :param value: New handler_name
@@ -115,7 +122,7 @@ class Handler:
         self._handler_name = value
 
     @property
-    def resp_json(self) -> dict:
+    def resp_json(self) -> Optional[dict]:
         """
 
         :param value: New resp_type
@@ -147,7 +154,7 @@ class Handler:
         self._once = value
 
     @property
-    def expiration(self) -> timedelta:
+    def expiration(self) -> Optional[timedelta]:
         """
 
         :param value: New expiration
@@ -158,7 +165,7 @@ class Handler:
         return self._expiration
 
     @expiration.setter
-    def expiration(self, value: timedelta) -> None:
+    def expiration(self, value: Optional[timedelta]) -> None:
         """"""
         self._expiration = value
 
@@ -172,7 +179,7 @@ class Handler:
 #
 
 
-def dummy_callback(message):
+def dummy_callback(message: object) -> object:
     return message
 
 

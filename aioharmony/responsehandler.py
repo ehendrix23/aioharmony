@@ -76,7 +76,7 @@ class ResponseHandler:
         self,
         handler: Handler,
         msgid: str = None,
-        expiration: Union[datetime, timedelta] = None,
+        expiration: Optional[Union[datetime, timedelta]] = None,
     ) -> str:
         """Register a handler.
 
