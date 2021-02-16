@@ -416,7 +416,7 @@ class HubConnector(slixmpp.ClientXMPP):
                     "xmlns": message.attrib.get("xmlns"),
                     "cmd": message.attrib.get("mime"),
                     "type": message.attrib.get("type"),
-                    "code": int(message.attrib.get("errorcode", "0")),
+                    "code": float(message.attrib.get("errorcode", "0")),
                     "codestring": message.attrib.get("errorstring"),
                     "data": data,
                 }
