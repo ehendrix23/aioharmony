@@ -216,6 +216,11 @@ class HarmonyClient:
                 continue
 
             if idx == 0:
+                if not isinstance(result, dict):
+                    raise aioexc.HarmonyException(
+                        f"Expecting dictionary but received {type(result)}"
+                    )
+
                 resp_data = result.get("data")
                 if resp_data is not None:
                     self._hub_config = self._hub_config._replace(
