@@ -39,7 +39,7 @@ class HubConnector:
         self,
         ip_address: str,
         response_queue: asyncio.Queue,
-        callbacks: ConnectorCallbackType = None,
+        callbacks: Optional[ConnectorCallbackType] = None,
         auto_reconnect=True,
     ) -> None:
         self._ip_address = ip_address
@@ -111,6 +111,9 @@ class HubConnector:
                 self._remote_id = response.get("activeRemoteId")
                 domain = urlparse(response.get("discoveryServer"))
                 self._domain = domain.netloc if domain.netloc else DEFAULT_DOMAIN
+                _LOGGER.debug(
+                    "Hub Remote ID %s, Hub Domain: %s", self._remote_id, self._domain
+                )
         return self._remote_id
 
     async def hub_connect(self, is_reconnect: bool = False) -> bool:
@@ -289,7 +292,7 @@ class HubConnector:
             is_reconnect = True
 
     async def hub_send(
-        self, command, params, msgid=None, post=False
+        self, command, params, get_timeout: Optional[int], msgid=None, post=False
     ) -> Optional[Union[asyncio.Future, str]]:
         """Send a payload request to Harmony Hub and return json response."""
 
@@ -312,11 +315,11 @@ class HubConnector:
         if not await self.hub_connect():
             return
 
-        payload = {
-            "hubId": self._remote_id,
-            "timeout": DEFAULT_TIMEOUT,
-            "hbus": {"cmd": command, "id": msgid, "params": params},
-        }
+        payload = {"hubId": self._remote_id}
+        if get_timeout:
+            payload.update({"timeout": get_timeout})
+
+        payload.update({"hbus": {"cmd": command, "id": msgid, "params": params}})
 
         _LOGGER.debug("%s: Sending payload: %s", self._ip_address, payload)
         try:

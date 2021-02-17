@@ -45,7 +45,7 @@ class HubConnector(slixmpp.ClientXMPP):
         self,
         ip_address: str,
         response_queue: asyncio.Queue,
-        callbacks: ConnectorCallbackType = None,
+        callbacks: Optional[ConnectorCallbackType] = None,
         auto_reconnect=True,
     ) -> None:
         self._ip_address = ip_address
@@ -330,7 +330,13 @@ class HubConnector(slixmpp.ClientXMPP):
             is_reconnect = True
 
     async def hub_send(
-        self, command, iq_type="get", params=None, msgid=None, post=False
+        self,
+        command,
+        iq_type="get",
+        params=None,
+        get_timeout=None,
+        msgid=None,
+        post=False,
     ) -> Optional[str]:
         """Send a payload request to Harmony Hub and return json response."""
         # Make sure we're connected.

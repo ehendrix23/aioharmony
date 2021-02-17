@@ -60,10 +60,10 @@ class Handler:
     def __init__(
         self,
         handler_obj: CallbackType,
-        handler_name: str = None,
-        resp_json: dict = None,
+        handler_name: Optional[str] = None,
+        resp_json: Optional[dict] = None,
         once: bool = True,
-        expiration: timedelta = None,
+        expiration: Optional[timedelta] = None,
     ) -> None:
         self._handler_obj = handler_obj
         self._handler_name = handler_name

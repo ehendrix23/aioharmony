@@ -54,7 +54,9 @@ class ResponseHandler:
     :type message_queue: asyncio.Queue
     """
 
-    def __init__(self, message_queue: asyncio.Queue, name: str = None) -> None:
+    def __init__(
+        self, message_queue: asyncio.Queue, name: Optional[str] = None
+    ) -> None:
         """"""
         self._message_queue = message_queue
         self._name = name
@@ -75,7 +77,7 @@ class ResponseHandler:
     def register_handler(
         self,
         handler: Handler,
-        msgid: str = None,
+        msgid: Optional[str] = None,
         expiration: Optional[Union[datetime, timedelta]] = None,
     ) -> str:
         """Register a handler.
@@ -237,7 +239,7 @@ class ResponseHandler:
         return callback_list
 
     def _unregister_expired_handlers(
-        self, single_handler: CallbackEntryType = None
+        self, single_handler: Optional[CallbackEntryType] = None
     ) -> bool:
         """
         Unregisters any expired handlers based on their expiration

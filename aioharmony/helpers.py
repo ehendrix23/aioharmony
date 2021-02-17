@@ -18,8 +18,8 @@ _LOGGER = logging.getLogger(__name__)
 def call_callback(
     callback_handler: CallbackType,
     result: object,
-    callback_uuid: str = None,
-    callback_name: str = None,
+    callback_uuid: Optional[str] = None,
+    callback_name: Optional[str] = None,
 ) -> bool:
     # If we were provided a callback handler then call it now.
     if callback_handler is None:
@@ -49,9 +49,9 @@ def call_callback(
 # TODO: Add this to Handler class
 def call_raw_callback(
     callback: CallbackType,
-    result: object = None,
-    callback_uuid: str = None,
-    callback_name: str = None,
+    result: Optional[object] = None,
+    callback_uuid: Optional[str] = None,
+    callback_name: Optional[str] = None,
 ) -> bool:
     """
     Executes or sets the callback provided based on the type of callback:
@@ -122,7 +122,9 @@ def call_raw_callback(
 
 
 def search_dict(
-    match_value: object = None, key: str = None, search_list: List[dict] = None
+    match_value: Optional[object] = None,
+    key: Optional[str] = None,
+    search_list: Optional[List[dict]] = None,
 ) -> Optional[dict]:
     """
     Returns the 1st element in a list containing dictionaries
