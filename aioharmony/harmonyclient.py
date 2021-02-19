@@ -12,7 +12,7 @@ import asyncio
 import copy
 from datetime import timedelta
 import logging
-from typing import List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Tuple, Type, Union
 from uuid import uuid4
 
 from async_timeout import timeout
@@ -35,6 +35,10 @@ import aioharmony.handler as handlers
 from aioharmony.helpers import call_callback, search_dict
 from aioharmony.responsehandler import Handler, ResponseHandler
 
+if TYPE_CHECKING:
+    from aioharmony.hubconnector_websocket import HubConnector as websocket_HubConnector
+    from aioharmony.hubconnector_xmpp import HubConnector as xmpp_HubConnector
+
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT = 60
@@ -51,55 +55,65 @@ class HarmonyClient:
     def __init__(
         self,
         ip_address: str,
-        protocol: PROTOCOL = None,
-        callbacks: ClientCallbackType = None,
-        loop: asyncio.AbstractEventLoop = None,
+        protocol: Optional[PROTOCOL] = None,
+        callbacks: Optional[ClientCallbackType] = None,
+        loop: Optional[asyncio.AbstractEventLoop] = None,
     ) -> None:
         _LOGGER.debug("%s: Initialize HUB", ip_address)
-        self._ip_address = ip_address
-        self._protocol = protocol
+        self._ip_address = ip_address  # type: str
+        self._protocol = protocol  # type: Optional[PROTOCOL]
         self._callbacks = (
             callbacks
             if callbacks is not None
             else ClientCallbackType(None, None, None, None, None)
-        )
-        self._loop = loop if loop else asyncio.get_event_loop()
+        )  # type: ClientCallbackType
+        self._loop = (
+            loop if loop else asyncio.get_event_loop()
+        )  # type: Optional[asyncio.AbstractEventLoop]
 
-        self._hub_config = ClientConfigType({}, {}, {}, {}, None, [], [])
-        self._current_activity_id = None
-        self._hub_connection = None
+        self._hub_config = ClientConfigType(
+            {}, {}, {}, {}, None, [], [], {}, {}
+        )  # type: ClientConfigType
+        self._current_activity_id = None  # type: Optional[int]
+        self._hub_connection = (
+            None
+        )  # type: Optional[Union[websocket_HubConnector, xmpp_HubConnector]]
 
         # Get the queue on which JSON responses will be put
-        self._response_queue = asyncio.Queue()
+        self._response_queue = asyncio.Queue()  # type: asyncio.Queue
 
         # Get the Response Handler
         self._callback_handler = ResponseHandler(
             message_queue=self._response_queue, name=self.name
-        )
+        )  # type: ResponseHandler
 
         # Create the lock for sending commands or starting an activity
-        self._snd_cmd_act_lck = asyncio.Lock()
+        self._snd_cmd_act_lck = asyncio.Lock()  # type: asyncio.Lock
 
         # Create the lock for getting HUB information.
-        self._sync_lck = asyncio.Lock()
+        self._sync_lck = asyncio.Lock()  # type: asyncio.Lock
 
         # Create the activity start handler object when start activity is finished
-        handler = copy.copy(handlers.HANDLER_START_ACTIVITY_FINISHED)
+        handler = copy.copy(handlers.HANDLER_START_ACTIVITY_FINISHED)  # type: Handler
         handler.handler_obj = self._update_activity_callback
         self._callback_handler.register_handler(handler=handler)
 
         # Create the activity start handler object when start activity is finished
-        handler = copy.copy(handlers.HANDLER_START_ACTIVITY_NOTIFY_STARTED)
+        handler = copy.copy(
+            handlers.HANDLER_START_ACTIVITY_NOTIFY_STARTED
+        )  # type: Handler
         handler.handler_obj = self._update_start_activity_callback
         self._callback_handler.register_handler(handler=handler)
 
         # Create the activity start handler object when start activity is finished
-        handler = copy.copy(handlers.HANDLER_STOP_ACTIVITY_NOTIFY_STARTED)
+        handler = copy.copy(
+            handlers.HANDLER_STOP_ACTIVITY_NOTIFY_STARTED
+        )  # type: Handler
         handler.handler_obj = self._update_start_activity_callback
         self._callback_handler.register_handler(handler=handler)
 
         # Create the notification handler object
-        handler = copy.copy(handlers.HANDLER_NOTIFY)
+        handler = copy.copy(handlers.HANDLER_NOTIFY)  # type: Handler
         handler.handler_obj = self._notification_callback
         self._callback_handler.register_handler(handler=handler)
 
@@ -132,7 +146,7 @@ class HarmonyClient:
         )
 
     @property
-    def current_activity_id(self):
+    def current_activity_id(self) -> Optional[int]:
         return self._current_activity_id
 
     async def _websocket_or_xmpp(self) -> bool:
@@ -201,7 +215,7 @@ class HarmonyClient:
         # accordingly.
 
         results = await asyncio.gather(
-            self.send_to_hub(command="get_current_state"),
+            self.send_to_hub(command="get_current_state", get_timeout=5),
             self.refresh_info_from_hub(),
             return_exceptions=True,
         )
@@ -270,7 +284,7 @@ class HarmonyClient:
         This should be called to ensure everything is stopped and
         cancelled out.
         """
-        raise_exception = None
+        raise_exception = None  # type: Optional[Union[Exception, Type[aioexc.TimeOut]]]
         if self._hub_connection:
             try:
                 with timeout(DEFAULT_TIMEOUT):
@@ -310,6 +324,8 @@ class HarmonyClient:
                     results = await asyncio.gather(
                         self._get_config(),
                         self._retrieve_hub_info(),
+                        self._get_automation_config(),
+                        self._get_automation_commands(),
                         return_exceptions=True,
                     )
             except asyncio.TimeoutError:
@@ -321,8 +337,14 @@ class HarmonyClient:
                     # Timeout exception, just put out error then.
                     if idx == 0:
                         result_name = "config"
-                    else:
+                    elif idx == 1:
+                        result_name = "automation config"
+                    elif idx == 2:
+                        result_name = "automation commands"
+                    elif idx == 3:
                         result_name = "hub info"
+                    else:
+                        result_name = "UNKNOWN!"
 
                     _LOGGER.error(
                         "%s: Timeout trying to retrieve %s.", self.name, result_name
@@ -355,13 +377,17 @@ class HarmonyClient:
         try:
             with timeout(DEFAULT_TIMEOUT / 2):
                 response = await self.send_to_hub(
-                    command="get_config", send_timeout=int(DEFAULT_TIMEOUT / 4)
+                    command="get_config",
+                    get_timeout=5,
+                    send_timeout=int(DEFAULT_TIMEOUT / 4),
                 )
         except (asyncio.TimeoutError, aioexc.TimeOut):
             try:
                 with timeout(DEFAULT_TIMEOUT / 2):
                     response = await self.send_to_hub(
-                        command="get_config", send_timeout=int(DEFAULT_TIMEOUT / 4)
+                        command="get_config",
+                        get_timeout=5,
+                        send_timeout=int(DEFAULT_TIMEOUT / 4),
                     )
             except (asyncio.TimeoutError, aioexc.TimeOut):
                 raise aioexc.TimeOut
@@ -410,9 +436,136 @@ class HarmonyClient:
 
         return self._hub_config.config
 
+    async def _get_automation_config(self) -> Optional[dict]:
+        """Retrieves the Harmony automation configuration.
+
+        Returns:
+            A nested dictionary containing automations
+        """
+        _LOGGER.debug("%s: Getting automation configuration", self.name)
+        # Send the command to the HUB
+        try:
+            with timeout(DEFAULT_TIMEOUT / 2):
+                response = await self.send_to_hub(
+                    command="automation_get_config",
+                    get_timeout=5,
+                    params={"uri": "dynamite://HomeAutomationService/Config/"},
+                    send_timeout=int(DEFAULT_TIMEOUT / 4),
+                )
+        except (asyncio.TimeoutError, aioexc.TimeOut):
+            try:
+                with timeout(DEFAULT_TIMEOUT / 2):
+                    response = await self.send_to_hub(
+                        command="automation_get_config",
+                        get_timeout=5,
+                        params={"uri": "dynamite://HomeAutomationService/Config/"},
+                        send_timeout=int(DEFAULT_TIMEOUT / 4),
+                    )
+            except (asyncio.TimeoutError, aioexc.TimeOut):
+                raise aioexc.TimeOut
+
+        if not response:
+            # There was an issue
+            return None
+
+        if not isinstance(response, dict):
+            raise aioexc.HarmonyException(
+                f"Expecting dictionary but received {type(response)}"
+            )
+        if response.get("code") != 200:
+            _LOGGER.error(
+                "%s: Incorrect status code %s received trying to "
+                "get automation configuration for %s",
+                self.name,
+                response.get("code"),
+                self._ip_address,
+            )
+            return None
+
+        self._hub_config = self._hub_config._replace(
+            automation_config=response.get("data")
+        )
+
+        self._hub_config = self._hub_config._replace(
+            activities=list(
+                {
+                    "name": a["label"],
+                    "name_lowercase": a["label"].lower(),
+                    "id": int(a["id"]),
+                }
+                for a in self._hub_config.config.get("activity")
+            )
+        )
+
+        self._hub_config = self._hub_config._replace(
+            devices=list(
+                {
+                    "name": a["label"],
+                    "name_lowercase": a["label"].lower(),
+                    "id": int(a["id"]),
+                }
+                for a in self._hub_config.config.get("device")
+            )
+        )
+
+        return self._hub_config.automation_config
+
+    async def _get_automation_commands(self) -> Optional[dict]:
+        """Retrieves the Harmony automation commands.
+
+        Returns:
+            A nested dictionary containing automation commands
+        """
+        _LOGGER.debug("%s: Getting automation commands", self.name)
+        # Send the command to the HUB
+        try:
+            with timeout(DEFAULT_TIMEOUT / 2):
+                response = await self.send_to_hub(
+                    command="automation_get_devices",
+                    params={
+                        "deviceIds": ["august78:9C:85:05:0E:B2"],
+                        "forceUpdate": True,
+                    },
+                    send_timeout=int(DEFAULT_TIMEOUT / 4),
+                )
+        except (asyncio.TimeoutError, aioexc.TimeOut):
+            try:
+                with timeout(DEFAULT_TIMEOUT / 2):
+                    response = await self.send_to_hub(
+                        command="automation_get_commands",
+                        params={"format": "json", "forceUpdate": True},
+                        send_timeout=int(DEFAULT_TIMEOUT / 4),
+                    )
+            except (asyncio.TimeoutError, aioexc.TimeOut):
+                raise aioexc.TimeOut
+
+        if not response:
+            # There was an issue
+            return None
+
+        if not isinstance(response, dict):
+            raise aioexc.HarmonyException(
+                f"Expecting dictionary but received {type(response)}"
+            )
+        if response.get("code") != 200:
+            _LOGGER.error(
+                "%s: Incorrect status code %s received trying to "
+                "get automation commands for %s",
+                self.name,
+                response.get("code"),
+                self._ip_address,
+            )
+            return None
+
+        self._hub_config = self._hub_config._replace(
+            automation_commands=response.get("data")
+        )
+
+        return self._hub_config.automation_devices
+
     async def _retrieve_provision_info(self) -> Optional[dict]:
 
-        response = None
+        response = None  # type: Optional[dict]
         result = None
         try:
             with timeout(DEFAULT_TIMEOUT / 2):
@@ -465,6 +618,7 @@ class HarmonyClient:
             with timeout(DEFAULT_TIMEOUT / 2):
                 result = await self.send_to_hub(
                     command="discovery",
+                    get_timeout=5,
                     post=False,
                     send_timeout=int(DEFAULT_TIMEOUT / 4),
                 )
@@ -476,6 +630,7 @@ class HarmonyClient:
                 with timeout(DEFAULT_TIMEOUT / 2):
                     result = await self.send_to_hub(
                         command="discovery",
+                        get_timeout=5,
                         post=False,
                         send_timeout=int(DEFAULT_TIMEOUT / 4),
                     )
@@ -507,7 +662,7 @@ class HarmonyClient:
         """Retrieve some information from the Hub."""
         # Send the command to the HUB
 
-        response = None
+        response = None  # type: Optional[dict]
 
         results = await asyncio.gather(
             self._retrieve_provision_info(),
@@ -519,15 +674,16 @@ class HarmonyClient:
                 raise result
 
             if idx == 0:
-                response = result  # type: Optional[dict]
+                response = result
 
         return response
 
     async def send_to_hub(
         self,
         command: str,
-        params: dict = None,
-        msgid: str = None,
+        get_timeout: Optional[int] = None,
+        params: Optional[dict] = None,
+        msgid: Optional[str] = None,
         wait: bool = True,
         post: bool = False,
         send_timeout: int = DEFAULT_TIMEOUT,
@@ -540,7 +696,7 @@ class HarmonyClient:
             params = {"verb": "get", "format": "json"}
 
         response = None
-        handler_uuid = None
+        handler_uuid = None  # type: Optional[str]
         if wait:
             response = self._loop.create_future()
             resp_handler = Handler(
@@ -557,6 +713,7 @@ class HarmonyClient:
                         HUB_COMMANDS[command]["mime"], HUB_COMMANDS[command]["command"]
                     ),
                     params=params,
+                    get_timeout=get_timeout,
                     msgid=msgid,
                     post=post,
                 )
@@ -600,6 +757,7 @@ class HarmonyClient:
             with timeout(DEFAULT_TIMEOUT / 2):
                 response = await self.send_to_hub(
                     command="get_current_activity",
+                    get_timeout=5,
                     send_timeout=int(DEFAULT_TIMEOUT / 4),
                 )
         except (asyncio.TimeoutError, aioexc.TimeOut):
@@ -610,6 +768,7 @@ class HarmonyClient:
                 with timeout(DEFAULT_TIMEOUT / 2):
                     response = await self.send_to_hub(
                         command="get_current_activity",
+                        get_timeout=5,
                         send_timeout=int(DEFAULT_TIMEOUT / 4),
                     )
             except (asyncio.TimeoutError, aioexc.TimeOut):
@@ -660,10 +819,10 @@ class HarmonyClient:
         return True
 
     # pylint: disable=broad-except
-    async def _notification_callback(self, message: dict = None) -> None:
+    async def _notification_callback(self, message: Optional[dict] = None) -> None:
         # We received a notification, check if the config version has changed.
         _LOGGER.debug("%s: Notification was received", self.name)
-        resp_data = message.get("data")
+        resp_data = message.get("data")  # type: Optional[dict]
         if resp_data is not None:
             current_hub_config_version = resp_data.get("configVersion")
             sync_status = resp_data.get("syncStatus")
@@ -695,8 +854,8 @@ class HarmonyClient:
         """Update current activity when changed."""
         _LOGGER.debug("%s: New activity was started", self.name)
 
-        new_activity = None
-        message_data = message.get("data")
+        new_activity = None  # type: Optional[int]
+        message_data = message.get("data")  # type: Optional[dict]
         if message_data is not None:
             new_activity = int(message_data.get("activityId"))
 
@@ -730,7 +889,7 @@ class HarmonyClient:
         """Update current activity when changed."""
         _LOGGER.debug("%s: New activity starting notification", self.name)
 
-        message_data = message.get("data")
+        message_data = message.get("data")  # type: Optional[dict]
         if message_data is not None and message_data.get("activityStatus") == 0:
             # The HUB sends a power off notification again that it is starting when it is done
             # thus intercepting this so we do not redo the callback.
@@ -778,29 +937,42 @@ class HarmonyClient:
 
     # pylint: disable=too-many-statements
     # pylint: disable=too-many-locals
-    async def start_activity(self, activity_id) -> tuple:
-        """Starts an activity.
+    async def start_activity(self, activity_id: int) -> Tuple[bool, Optional[str]]:
+        """Start an activity
 
         Args:
-            activity_id: An int or string identifying the activity to start
+            activity_id (int): An int or string identifying the activity to start
+
+        Raises:
+            aioexc.TimeOut: [description]
 
         Returns:
-            True if activity started, otherwise False
+            Tuple[bool, Optional[str]]:
+              bool: identify if activity was started successfully (True) or not (False)
+              str: Optional string with the message returned upon success or failure
+
         """
+
         _LOGGER.debug(
             "%s: Starting activity %s (%s)",
             self.name,
             self.get_activity_name(activity_id),
             activity_id,
         )
-        params = {"async": "true", "timestamp": 0, "activityId": str(activity_id)}
-        msgid = str(uuid4())
+        params = {
+            "async": "true",
+            "timestamp": 0,
+            "activityId": str(activity_id),
+        }  # type: dict
+        msgid = str(uuid4())  # type: str
 
-        activity_completed = self._loop.create_future()
-        handler_list = []
+        activity_completed = self._loop.create_future()  # type: asyncio.Future
+        handler_list = []  # type: List[Tuple[str, Handler]]
 
         def register_activity_handler(activity_handler: Handler) -> None:
-            handler_uuid = self.register_handler(handler=activity_handler, msgid=msgid)
+            handler_uuid = self.register_handler(
+                handler=activity_handler, msgid=msgid
+            )  # type: str
             handler_list.append((handler_uuid, activity_handler))
 
         def unregister_handlers() -> None:
@@ -814,7 +986,7 @@ class HarmonyClient:
                         activity_handler[0],
                     )
 
-        def set_result(result: tuple) -> None:
+        def set_result(result: Tuple[bool, Optional[str]]) -> None:
             if activity_completed.done():
                 _LOGGER.debug(
                     "%s: Result was already set through a previous " "message.",
@@ -823,7 +995,7 @@ class HarmonyClient:
                 return
             activity_completed.set_result(result)
 
-        def startactivity_started_callback(message: dict):
+        def startactivity_started_callback(message: dict) -> None:
             if message.get("code") not in [100, 200]:
                 _LOGGER.debug(
                     "%s: RunActivity code error: %s", self.name, message.get("code")
@@ -831,9 +1003,12 @@ class HarmonyClient:
                 set_result((False, message.get("msg")))
 
         def startactivity_in_progress_callback(message: dict) -> None:
-            data = message.get("data")
+            data = message.get("data")  # type: Optional[dict]
             if data is not None:
-                progress = {"completed": data.get("done"), "total": data.get("total")}
+                progress = {
+                    "completed": data.get("done"),
+                    "total": data.get("total"),
+                }  # type: dict
                 _LOGGER.info(
                     "%s: %s/%s of start activity %s completed.",
                     self.name,
@@ -863,21 +1038,23 @@ class HarmonyClient:
 
         # Register handler to identify failure for initiating the start of
         # the activity
-        handler = copy.copy(handlers.HANDLER_RUN_ACTIVITY)
+        handler = copy.copy(handlers.HANDLER_RUN_ACTIVITY)  # type: Handler
         handler.handler_obj = startactivity_started_callback
         register_activity_handler(activity_handler=handler)
 
         # Register first handler to track progress of the start activity
-        handler = copy.copy(handlers.HANDLER_START_ACTIVITY_IN_PROGRESS)
+        handler = copy.copy(
+            handlers.HANDLER_START_ACTIVITY_IN_PROGRESS
+        )  # type: Handler
         handler.handler_obj = startactivity_in_progress_callback
         register_activity_handler(activity_handler=handler)
 
         # Register second handler to track progress of the start activity
-        handler = copy.copy(handlers.HANDLER_HELPDISCRETES)
+        handler = copy.copy(handlers.HANDLER_HELPDISCRETES)  # type: Handler
         handler.handler_obj = startactivity_in_progress_callback
         register_activity_handler(activity_handler=handler)
 
-        handler = copy.copy(handlers.HANDLER_START_ACTIVITY_COMPLETE)
+        handler = copy.copy(handlers.HANDLER_START_ACTIVITY_COMPLETE)  # type: Handler
         handler.handler_obj = startactivity_completed_callback
         register_activity_handler(activity_handler=handler)
 
@@ -885,14 +1062,18 @@ class HarmonyClient:
         # Get the lock ensuring we're the only ones able to initiate
         async with self._snd_cmd_act_lck:
             response = await self.send_to_hub(
-                command="start_activity", params=params, msgid=msgid, wait=False
+                command="start_activity",
+                get_timeout=5,
+                params=params,
+                msgid=msgid,
+                wait=False,
             )
             if not response:
                 unregister_handlers()
 
             try:
                 with timeout(DEFAULT_TIMEOUT):
-                    status = await activity_completed
+                    status = await activity_completed  # Tuple[bool, Optional[str]]
             except asyncio.TimeoutError:
                 raise aioexc.TimeOut
             finally:
@@ -912,8 +1093,8 @@ class HarmonyClient:
 
         _LOGGER.debug("%s: Sending commands to HUB", self.name)
         # Get the lock ensuring we're the only ones able to initiate
-        command_future_list = []
-        msgid_dict = {}
+        command_future_list = []  # type: List[asyncio.Future]
+        msgid_dict = {}  # type: dict[str, SendCommand]
         async with self._snd_cmd_act_lck:
             for command in commands:
                 if isinstance(command, (float, int)):
@@ -925,7 +1106,7 @@ class HarmonyClient:
                 # the command, otherwise it won't sent anything back.
                 command_future_list.append(self._loop.create_future())
 
-                expiration = 0.5
+                expiration = 0.5  # type: float
                 if command.delay is not None:
                     expiration += command.delay
 
@@ -948,10 +1129,10 @@ class HarmonyClient:
         # have been received.
         done, _ = await asyncio.wait(command_future_list, timeout=1)
 
-        error_response_list = []
+        error_response_list = []  # type: List[SendCommandResponse]
         for result_returned in done:
             result = result_returned.result()
-            msgid = result.get("id")
+            msgid = result.get("id")  # type: Optional[str]
             if msgid is None:
                 _LOGGER.warning(
                     "%s: Received response for send commands " "without a message id",
@@ -1020,18 +1201,23 @@ class HarmonyClient:
             "action": '{{"command":: "{}",'
             '"type":: "IRCommand",'
             '"deviceId":: "{}"}}'.format(command.command, command.device),
-        }
-        msgid_press = str(uuid4())
+        }  # type: dict
+        msgid_press = str(uuid4())  # type: str
 
         # Register the handler for this command.
         self.register_handler(handler=callback_handler, msgid=msgid_press)
 
         # Send the command to the HUB
         response = await self.send_to_hub(
-            command="send_command", params=params, msgid=msgid_press, wait=False
-        )
+            command="send_command",
+            get_timeout=5,
+            params=params,
+            msgid=msgid_press,
+            wait=False,
+        )  # type: Union[dict, bool]
+
+        # If response is false then there was an issue.
         if not response:
-            # There was an issue
             return None, None
 
         if command.delay > 0:
@@ -1058,7 +1244,7 @@ class HarmonyClient:
         )
         return msgid_press, msgid_release
 
-    def get_activity_id(self, activity_name) -> Optional[int]:
+    def get_activity_id(self, activity_name: Optional[str]) -> Optional[int]:
         """Find the activity ID for the provided activity name."""
         if activity_name is None:
             return None
@@ -1067,10 +1253,10 @@ class HarmonyClient:
             match_value=activity_name.lower(),
             key="name_lowercase",
             search_list=self._hub_config.activities,
-        )
+        )  # type: Optional[dict]
         return item.get("id") if item else None
 
-    def get_activity_name(self, activity_id) -> Optional[str]:
+    def get_activity_name(self, activity_id: Optional[int]) -> Optional[str]:
         """Find the activity name for the provided ID."""
         if activity_id is None:
             return None
@@ -1079,10 +1265,10 @@ class HarmonyClient:
             match_value=int(activity_id),
             key="id",
             search_list=self._hub_config.activities,
-        )
+        )  # type: Optional[dict]
         return item.get("name") if item else None
 
-    def get_device_id(self, device_name) -> Optional[int]:
+    def get_device_id(self, device_name: Optional[str]) -> Optional[int]:
         """Find the device ID for the provided device name."""
         if device_name is None:
             return None
@@ -1091,17 +1277,17 @@ class HarmonyClient:
             match_value=device_name.lower(),
             key="name_lowercase",
             search_list=self._hub_config.devices,
-        )
+        )  # type: Optional[dict]
         return item.get("id") if item else None
 
-    def get_device_name(self, device_id) -> Optional[str]:
+    def get_device_name(self, device_id: Optional[int]) -> Optional[str]:
         """Find the device name for the provided ID."""
         if device_id is None:
             return None
 
         item = search_dict(
             match_value=int(device_id), key="id", search_list=self._hub_config.devices
-        )
+        )  # type: Optional[dict]
         return item.get("name") if item else None
 
     def register_handler(self, *args, **kwargs) -> str:

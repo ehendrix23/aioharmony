@@ -15,6 +15,7 @@ DEFAULT_DISCOVER_STRING = "_logitech-reverse-bonjour._tcp.local."
 DEFAULT_XMPP_HUB_PORT = "5222"
 DEFAULT_WS_HUB_PORT = "8088"
 DEFAULT_HARMONY_MIME = "vnd.logitech.harmony/vnd.logitech.harmony.engine"
+DEFAULT_HARMONY_AUTOMATION_MIME = "harmony.automation"
 
 WEBSOCKETS = "WEBSOCKETS"
 XMPP = "XMPP"
@@ -37,6 +38,15 @@ HUB_COMMANDS = {
     },
     "send_command": {"mime": DEFAULT_HARMONY_MIME, "command": "holdAction"},
     "start_activity": {"mime": "harmony.activityengine", "command": "runactivity"},
+    "automation_get_config": {"mime": "proxy.resource", "command": "get"},
+    "automation_get_devices": {
+        "mime": DEFAULT_HARMONY_AUTOMATION_MIME,
+        "command": "getstate",
+    },
+    "automation_send_command": {
+        "mime": DEFAULT_HARMONY_AUTOMATION_MIME,
+        "command": "holdAction",
+    },
     "sync": {"mime": "setup.sync", "command": None},
     "provision_info": {"mime": "setup.account", "command": "getProvisionInfo"},
     "discovery": {"mime": "connect.discoveryinfo", "command": "get"},
@@ -64,6 +74,7 @@ ClientCallbackType = NamedTuple(
     ],
 )
 
+
 ConnectorCallbackType = NamedTuple(
     "ConnectorCallbackType",
     [("connect", Optional[CallbackType]), ("disconnect", Optional[CallbackType])],
@@ -79,6 +90,8 @@ ClientConfigType = NamedTuple(
         ("config_version", Optional[int]),
         ("activities", List[dict]),
         ("devices", List[dict]),
+        ("automation_config", dict),
+        ("automation_devices", dict),
     ],
 )
 

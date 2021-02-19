@@ -150,7 +150,7 @@ async def show_detailed_config(client, _):
     if config:
         print(f"HUB: {client.name}")
         print(
-            f"\t {json.dumps(client.hub_config, sort_keys=True, indent=4, separators=(',', ': '))}"
+            f"\t {json.dumps(client.hub_config.automation_config, sort_keys=True, indent=4, separators=(',', ': '))}"
         )
     else:
         print(f"HUB: {client.name} There was a problem retrieving the configuration")

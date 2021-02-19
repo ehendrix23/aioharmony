@@ -14,7 +14,7 @@ import asyncio
 from datetime import datetime, timedelta
 import json
 import logging
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 from aioharmony.const import (
     PROTOCOL,
@@ -43,9 +43,9 @@ class HarmonyAPI:
     def __init__(
         self,
         ip_address: str,
-        protocol: PROTOCOL = None,
-        callbacks: ClientCallbackType = None,
-        loop: asyncio.AbstractEventLoop = None,
+        protocol: Optional[PROTOCOL] = None,
+        callbacks: Optional[ClientCallbackType] = None,
+        loop: Optional[asyncio.AbstractEventLoop] = None,
     ) -> None:
         _LOGGER.debug("%s: Initialize", ip_address)
         loop = loop if loop else asyncio.get_event_loop()
@@ -86,7 +86,7 @@ class HarmonyAPI:
         return self.hub_config.info.get("activeRemoteId")
 
     @property
-    def current_activity(self) -> tuple:
+    def current_activity(self) -> Tuple[Optional[int], Optional[str]]:
         return (
             self._harmony_client.current_activity_id,
             self._harmony_client.get_activity_name(
@@ -97,6 +97,14 @@ class HarmonyAPI:
     @property
     def config(self) -> dict:
         return self.hub_config.config
+
+    @property
+    def automation_config(self) -> dict:
+        return self.hub_config.automation_config
+
+    @property
+    def automation_devices(self) -> dict:
+        return self.hub_config.automation_devices
 
     @property
     def json_config(self) -> dict:
@@ -136,16 +144,16 @@ class HarmonyAPI:
     def callbacks(self, value: ClientCallbackType) -> None:
         self._harmony_client.callbacks = value
 
-    def get_activity_id(self, activity_name) -> Optional[int]:
+    def get_activity_id(self, activity_name: str) -> Optional[int]:
         return self._harmony_client.get_activity_id(activity_name=activity_name)
 
-    def get_activity_name(self, activity_id) -> Optional[str]:
+    def get_activity_name(self, activity_id: int) -> Optional[str]:
         return self._harmony_client.get_activity_name(activity_id=activity_id)
 
-    def get_device_id(self, device_name) -> Optional[int]:
+    def get_device_id(self, device_name: str) -> Optional[int]:
         return self._harmony_client.get_device_id(device_name=device_name)
 
-    def get_device_name(self, device_id) -> Optional[str]:
+    def get_device_name(self, device_id: int) -> Optional[str]:
         return self._harmony_client.get_device_name(device_id=device_id)
 
     async def connect(self) -> bool:
@@ -157,8 +165,8 @@ class HarmonyAPI:
     def register_handler(
         self,
         handler: Handler,
-        msgid: str = None,
-        expiration: Union[datetime, timedelta] = None,
+        msgid: Optional[str] = None,
+        expiration: Optional[Union[datetime, timedelta]] = None,
     ) -> str:
         """Register a handler.
 
@@ -199,7 +207,9 @@ class HarmonyAPI:
         """Syncs the harmony hub with the web service."""
         _LOGGER.debug("%s: Performing sync", self.name)
         # Send the command to the HUB
-        response = await self._harmony_client.send_to_hub(command="sync")
+        response = await self._harmony_client.send_to_hub(
+            command="sync"
+        )  # type: Union[dict, bool]
         if not response or (isinstance(response, dict) and response.get("code") != 200):
             # There was an issue
             return False
@@ -208,7 +218,7 @@ class HarmonyAPI:
         await self._harmony_client.refresh_info_from_hub()
         return True
 
-    async def start_activity(self, activity_id) -> tuple:
+    async def start_activity(self, activity_id: int) -> Tuple[bool, Optional[str]]:
         return await self._harmony_client.start_activity(activity_id=activity_id)
 
     async def send_commands(
@@ -230,7 +240,7 @@ class HarmonyAPI:
         Returns:
             True if the system becomes or is off
         """
-        result = await self.start_activity(-1)
+        result = await self.start_activity(-1)  # Tuple[bool, Optional[str]]
         return result[0]
 
     async def change_channel(self, channel: int) -> bool:
@@ -242,17 +252,17 @@ class HarmonyAPI:
         :rtype: bool
         """
         _LOGGER.debug("%s: Changing channel to %s", self.name, channel)
-        params = {"timestamp": 0, "channel": str(channel)}
+        params = {"timestamp": 0, "channel": str(channel)}  # type: dict
 
         # Send the command to the HUB
         response = await self._harmony_client.send_to_hub(
             command="change_channel", params=params
-        )
+        )  # type: Union[dict, bool]
         if not response:
             # There was an issue
             return False
 
         if isinstance(response, dict):
-            response = response.get("code") == 200
+            return response.get("code") == 200
 
         return response
