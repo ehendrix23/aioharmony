@@ -430,7 +430,7 @@ class HubConnector(slixmpp.ClientXMPP):
                                 continue
 
                             # If we have : and nothing on the stack then we have the value
-                            if character == ":" and len(stack) == 0:
+                            if character == ":" and not stack:
                                 # Now we will have key and value, add to our dictionary.
                                 if is_json:
                                     # It is a JSON value. Run it through for decoding.
@@ -483,6 +483,21 @@ class HubConnector(slixmpp.ClientXMPP):
                                 # If it is a { then it means this value is a JSON object.
                                 if character == "{":
                                     is_json = True
+
+                        # Add the last one.
+                        if have_key:
+                            if is_json:
+                                # It is a JSON value. Run it through for decoding.
+                                try:
+                                    value = json.loads(value)
+                                except json.JSONDecodeError:
+                                    _LOGGER.debug(
+                                        "%s: value is not a JSON object: %s",
+                                        self._ip_address,
+                                        value,
+                                    )
+
+                            data.update({key: value})
 
                 # Create response dictionary
                 response = {
