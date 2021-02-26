@@ -411,10 +411,78 @@ class HubConnector(slixmpp.ClientXMPP):
                         data = json.loads(message.text)
                     except json.JSONDecodeError:
                         # Should mean only a single value was received.
-                        for item in message.text.split(":"):
-                            item_split = item.split("=")
-                            if len(item_split) == 2:
-                                data.update({item_split[0]: item_split[1]})
+                        _LOGGER.debug(
+                            "%s: response is not a JSON object: %s",
+                            self._ip_address,
+                            message.text,
+                        )
+                        pairings = {"{": "}", '"': '"'}
+                        have_key = escape = is_json = False
+                        key = value = ""
+                        stack = []
+                        for character in message.text:
+                            # If we don't have the key yet then keep adding to the key until we reach =
+                            if not have_key:
+                                if character == "=":
+                                    have_key = True
+                                else:
+                                    key = key + character
+                                continue
+
+                            # If we have : and nothing on the stack then we have the value
+                            if character == ":" and len(stack) == 0:
+                                # Now we will have key and value, add to our dictionary.
+                                if is_json:
+                                    # It is a JSON value. Run it through for decoding.
+                                    try:
+                                        value = json.loads(value)
+                                    except json.JSONDecodeError:
+                                        _LOGGER.debug(
+                                            "%s: value is not a JSON object: %s",
+                                            self._ip_address,
+                                            value,
+                                        )
+
+                                data.update({key: value})
+                                have_key = escape = is_json = False
+                                key = value = ""
+                                stack = []
+                                continue
+
+                            # We're going through the value. This can be a JSON object and hence we need to
+                            # get everything between the 1st { and last }
+                            value = value + character
+
+                            # If previous was a \ (escape) then just move on with next character.
+                            if escape:
+                                escape = False
+                                continue
+
+                            # If character now is \ then it means it is escape character.
+                            if character == "\\":
+                                escape = True
+                                continue
+
+                            # Now we know that if we get " and we already have an open " that it is the closing one.
+                            # Check if what we should get for the next closing element: } or "
+                            closing_element = (
+                                pairings.get(stack[-1]) if len(stack) != 0 else None
+                            )
+
+                            # Check if this character is the closing element we're expecting
+                            if character == closing_element:
+                                # It is, pop from our stack and move to next one.
+                                stack.pop()
+                                continue
+
+                            # It is not a closing. Only thing left now is an open one or any other character
+                            # any other character.
+                            if character in pairings:
+                                # This is an opening character, add it to the stack.
+                                stack.append(character)
+                                # If it is a { then it means this value is a JSON object.
+                                if character == "{":
+                                    is_json = True
 
                 # Create response dictionary
                 response = {
