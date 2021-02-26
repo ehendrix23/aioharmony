@@ -449,7 +449,10 @@ class HarmonyClient:
                 response = await self.send_to_hub(
                     command="automation_get_config",
                     get_timeout=5,
-                    params={"uri": "dynamite://HomeAutomationService/Config/"},
+                    params={
+                        "uri": "dynamite:://HomeAutomationService/Config/",
+                        "encode": "true",
+                    },
                     send_timeout=int(DEFAULT_TIMEOUT / 4),
                 )
         except (asyncio.TimeoutError, aioexc.TimeOut):
@@ -523,7 +526,7 @@ class HarmonyClient:
                 response = await self.send_to_hub(
                     command="automation_get_devices",
                     params={
-                        "deviceIds": ["august78:9C:85:05:0E:B2"],
+                        "format": "json",
                         "forceUpdate": True,
                     },
                     send_timeout=int(DEFAULT_TIMEOUT / 4),
