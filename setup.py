@@ -21,7 +21,7 @@ DESCRIPTION = (
 URL = "https://github.com/ehendrix23/aioharmony"
 EMAIL = "hendrix_erik@hotmail.com"
 AUTHOR = "Erik Hendrix"
-REQUIRES_PYTHON = ">=3.5.3"
+REQUIRES_PYTHON = ">=3.8"
 VERSION = None
 
 # What packages are required for this module to be executed?
