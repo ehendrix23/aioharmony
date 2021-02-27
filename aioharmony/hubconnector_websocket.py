@@ -6,8 +6,8 @@ responses."""
 
 import asyncio
 from contextlib import suppress
+import json
 import logging
-import socket
 from typing import Optional, Union
 from urllib.parse import urlparse
 from uuid import uuid4
@@ -20,6 +20,7 @@ from aioharmony.const import (
     ConnectorCallbackType,
 )
 from aioharmony.helpers import call_callback
+from aioharmony.hubconnector import HubConnector
 
 DEFAULT_DOMAIN = "svcs.myharmony.com"
 DEFAULT_TIMEOUT = 5
@@ -32,7 +33,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 # pylint: disable=too-many-instance-attributes
-class HubConnector:
+class HubConnector_websockets(HubConnector):
     """An websocket client for connecting to the Logitech Harmony devices."""
 
     def __init__(
@@ -42,64 +43,17 @@ class HubConnector:
         callbacks: Optional[ConnectorCallbackType] = None,
         auto_reconnect=True,
     ) -> None:
-        self._ip_address = ip_address
-        self._response_queue = response_queue
-        self._callbacks = (
-            callbacks if callbacks is not None else ConnectorCallbackType(None, None)
+
+        super().__init__(
+            ip_address=ip_address,
+            response_queue=response_queue,
+            callbacks=callbacks,
+            auto_reconnect=auto_reconnect,
         )
-        self._auto_reconnect = auto_reconnect
 
         self._remote_id = None
-        self._domain = DEFAULT_DOMAIN
 
-        self._aiohttp_session = None
         self._websocket = None
-
-        self._connect_disconnect_lock = asyncio.Lock()
-
-        self._listener_task = None
-
-        self._connected = False
-
-    @property
-    def callbacks(self) -> ConnectorCallbackType:
-        """Return callbacks."""
-        return self._callbacks
-
-    @callbacks.setter
-    def callbacks(self, value: ConnectorCallbackType) -> None:
-        """Set callbacks."""
-        self._callbacks = value
-
-    async def close(self):
-        """Close all connections and tasks
-
-        This should be called to ensure everything is stopped and
-        cancelled out.
-        """
-        # Close connections.
-        await self.hub_disconnect()
-
-    @property
-    def _session(self):
-        """Create the aiohttp client session if not existing."""
-        # Set connection timeout. Default total timeout is 5 minutes.
-        if self._aiohttp_session:
-            return self._aiohttp_session
-
-        # Specify socket
-        conn = aiohttp.TCPConnector(
-            family=socket.AF_INET,
-            verify_ssl=False,
-            force_close=True,
-            enable_cleanup_closed=True,
-        )
-
-        session_timeout = aiohttp.ClientTimeout(connect=DEFAULT_TIMEOUT)  # type: ignore
-        self._aiohttp_session = aiohttp.ClientSession(
-            connector=conn, timeout=session_timeout
-        )
-        return self._aiohttp_session
 
     async def _get_remote_id(self) -> Optional[str]:
         """Retrieve remote id from the HUB."""
@@ -145,7 +99,7 @@ class HubConnector:
                 "%s: Connecting for hub %s", self._ip_address, self._remote_id
             )
             try:
-                self._websocket = await self._session.ws_connect(
+                self._websocket = await self.aiohttp_session.ws_connect(
                     "ws://{}:{}/?domain={}&hubId={}".format(
                         self._ip_address,
                         DEFAULT_HUB_PORT,
@@ -223,7 +177,7 @@ class HubConnector:
                 with suppress(asyncio.TimeoutError), timeout(DEFAULT_TIMEOUT):
                     await self._websocket.close()
 
-                await self._session.close()
+                await super().hub_disconnect()
                 # Zero-sleep to allow underlying connections to close.
                 await asyncio.sleep(0)
 
@@ -330,22 +284,6 @@ class HubConnector:
 
         return msgid
 
-    async def hub_post(self, url, json_request, headers=None) -> Optional[dict]:
-        """Post a json request and return the response."""
-        _LOGGER.debug("%s: Sending post request: %s", self._ip_address, json_request)
-        try:
-            async with self._session.post(
-                url, json=json_request, headers=headers
-            ) as response:
-                json_response = await response.json(content_type=None)
-                _LOGGER.debug("%s: Post response: %s", self._ip_address, json_response)
-        except aiohttp.ClientError as exc:
-            _LOGGER.error("%s: Exception on post: %s", self._ip_address, exc)
-        else:
-            return json_response
-
-        return None
-
     # pylint: disable=broad-except
     async def _listener(self, websocket=None) -> None:
         """Listen for  messages on web socket"""
@@ -402,8 +340,32 @@ class HubConnector:
                 if not response_json:
                     continue
 
+                # It is possible that a value contains a JSON object, loop through all values
+                # and convert value JSON to dict if JSON.
+                data = {}
+                for key in response_json:
+                    value = response_json[key]
+                    if isinstance(value, dict):
+                        for key2 in value:
+                            value2 = value[key2]
+                            if isinstance(value2, str) and len(value2) > 2:
+                                if value2[0] == "{":
+                                    # Value is a JSON response.
+                                    try:
+                                        value2 = json.loads(value2)
+                                    except json.JSONDecodeError:
+                                        _LOGGER.debug(
+                                            "%s: JSON decoding error with %s",
+                                            self._ip_address,
+                                            value2,
+                                        )
+                                        pass
+                            value.update({key2: value2})
+
+                    data.update({key: value})
+
                 # Put response on queue.
-                self._response_queue.put_nowait(response_json)
+                self._response_queue.put_nowait(data)
 
             except asyncio.CancelledError:
                 _LOGGER.debug("%s: Received STOP for listener", self._ip_address)

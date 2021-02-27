@@ -23,6 +23,7 @@ from aioharmony.const import (
 )
 import aioharmony.exceptions as aioexc
 from aioharmony.helpers import call_callback
+from aioharmony.hubconnector import HubConnector
 
 DEFAULT_DOMAIN = "svcs.myharmony.com"
 DEFAULT_TIMEOUT = 5
@@ -38,7 +39,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 # pylint: disable=too-many-instance-attributes
-class HubConnector(slixmpp.ClientXMPP):
+class HubConnector_xmpp(HubConnector):
     """An XMPP client for connecting to the Logitech Harmony devices."""
 
     def __init__(
@@ -48,31 +49,27 @@ class HubConnector(slixmpp.ClientXMPP):
         callbacks: Optional[ConnectorCallbackType] = None,
         auto_reconnect=True,
     ) -> None:
-        self._ip_address = ip_address
-        self._response_queue = response_queue
-        self._callbacks = (
-            callbacks if callbacks is not None else ConnectorCallbackType(None, None)
-        )
-        self._auto_reconnect = auto_reconnect
 
-        self._domain = DEFAULT_DOMAIN
-
-        self._connect_disconnect_lock = asyncio.Lock()
-
-        self._listener_task = None
         self._listener_message_received = None
+        self._xmppclient = None
 
-        self._connected = False
+        super().__init__(
+            ip_address=ip_address,
+            response_queue=response_queue,
+            callbacks=callbacks,
+            auto_reconnect=auto_reconnect,
+        )
+        self._init_xmppclient()
 
-        self._plugin_config = {
-            # Enables PLAIN authentication which is off by default.
-            "feature_mechanisms": {"unencrypted_plain": True},
-        }
-        self._init_super()
+    def _init_xmppclient(self):
 
-    def _init_super(self):
-        super(HubConnector, self).__init__(
-            DEFAULT_USER, DEFAULT_PASSWORD, plugin_config=self._plugin_config
+        self._xmppclient = slixmpp.ClientXMPP(
+            jid=DEFAULT_USER,
+            password=DEFAULT_PASSWORD,
+            plugin_config={
+                # Enables PLAIN authentication which is off by default.
+                "feature_mechanisms": {"unencrypted_plain": True},
+            },
         )
 
         # Set keep-alive to 30 seconds.
@@ -80,16 +77,6 @@ class HubConnector(slixmpp.ClientXMPP):
 
         # Register all the event handlers and callbacks within XMPP
         self._register_handlers()
-
-    @property
-    def callbacks(self) -> ConnectorCallbackType:
-        """Return callbacks."""
-        return self._callbacks
-
-    @callbacks.setter
-    def callbacks(self, value: ConnectorCallbackType) -> None:
-        """Set callbacks."""
-        self._callbacks = value
 
     def _register_handlers(self):
         """Register all the different handlers within XMPP based on
@@ -100,14 +87,14 @@ class HubConnector(slixmpp.ClientXMPP):
         self._listener()
 
         # Register callback for connection.
-        self.add_event_handler(
+        self._xmppclient.add_event_handler(
             "connected",
             self._connected_handler,
             disposable=False,
         )
 
         # Register callback for disconnections.
-        self.add_event_handler(
+        self._xmppclient.add_event_handler(
             "disconnected",
             self._disconnected_handler,
             disposable=False,
@@ -116,18 +103,9 @@ class HubConnector(slixmpp.ClientXMPP):
     def _deregister_handlers(self):
         # Remove handlers.
         _LOGGER.debug("%s: Removing internal handlers.", self._ip_address)
-        self.del_event_handler("connected", self._connected_handler)
-        self.del_event_handler("disconnected", self._disconnected_handler)
-        self.remove_handler("listener")
-
-    async def close(self):
-        """Close all connections and tasks
-
-        This should be called to ensure everything is stopped and
-        cancelled out.
-        """
-        # Close connections.
-        await self.hub_disconnect()
+        self._xmppclient.del_event_handler("connected", self._connected_handler)
+        self._xmppclient.del_event_handler("disconnected", self._disconnected_handler)
+        self._xmppclient.remove_handler("listener")
 
     async def hub_connect(self, is_reconnect: bool = False) -> bool:
         """Connect to Hub"""
@@ -151,37 +129,37 @@ class HubConnector(slixmpp.ClientXMPP):
             connected = loop.create_future()
 
             def connection_success(_):
-                self.del_event_handler("connection_failed", connection_failed)
+                self._xmppclient.del_event_handler(
+                    "connection_failed", connection_failed
+                )
                 connected.set_result(True)
 
             def connection_failed(event):
                 connected.set_exception(event)
-                self.cancel_connection_attempt()
-                self.del_event_handler("connected", connection_success)
-                # Doing below as for some reason cancel does not really
-                # cancel it. This will result in exception and it
-                # stopping.
-                self.address = (None, None)
+                self._xmppclient.cancel_connection_attempt()
+                self._xmppclient.del_event_handler("connected", connection_success)
 
             def remove_handlers():
                 # Remove the handlers.
-                self.del_event_handler("connection_failed", connection_failed)
-                self.del_event_handler("connected", connection_success)
+                self._xmppclient.del_event_handler(
+                    "connection_failed", connection_failed
+                )
+                self._xmppclient.del_event_handler("connected", connection_success)
 
-            self.add_event_handler(
+            self._xmppclient.add_event_handler(
                 "connected",
                 connection_success,
                 disposable=True,
             )
 
-            self.add_event_handler(
+            self._xmppclient.add_event_handler(
                 "connection_failed",
                 connection_failed,
                 disposable=True,
             )
 
             try:
-                super(HubConnector, self).connect(
+                self._xmppclient.connect(
                     address=(self._ip_address, DEFAULT_HUB_PORT),
                     disable_starttls=True,
                     use_ssl=False,
@@ -252,12 +230,12 @@ class HubConnector(slixmpp.ClientXMPP):
 
             self._deregister_handlers()
 
-            self.add_event_handler(
+            self._xmppclient.add_event_handler(
                 "disconnected",
                 disconnect_result,
                 disposable=True,
             )
-            super(HubConnector, self).disconnect()
+            self._xmppclient.disconnect()
 
             # Wait till we're disconnected.
             try:
@@ -265,8 +243,10 @@ class HubConnector(slixmpp.ClientXMPP):
                     await disconnected
             except asyncio.TimeoutError:
                 _LOGGER.debug("%s: Timeout trying to disconnect.", self._ip_address)
-                self.del_event_handler("disconnected", disconnect_result)
+                self._xmppclient.del_event_handler("disconnected", disconnect_result)
                 raise aioexc.TimeOut
+
+            await super().hub_disconnect()
 
     def _connected_handler(self, _) -> None:
         """Call handler for connection."""
@@ -311,7 +291,7 @@ class HubConnector(slixmpp.ClientXMPP):
         is_reconnect = False
 
         self._deregister_handlers()
-        self._init_super()
+        self._init_xmppclient()
 
         sleep_time = 1
         await asyncio.sleep(sleep_time)
@@ -355,15 +335,15 @@ class HubConnector(slixmpp.ClientXMPP):
             msgid = str(uuid4())
 
         if iq_type == "query":
-            iq_stanza = self.make_iq_query()
+            iq_stanza = self._xmppclient.make_iq_query()
         elif iq_type == "set":
-            iq_stanza = self.make_iq_set()
+            iq_stanza = self._xmppclient.make_iq_set()
         elif iq_type == "result":
-            iq_stanza = self.make_iq_result()
+            iq_stanza = self._xmppclient.make_iq_result()
         elif iq_type == "error":
-            iq_stanza = self.make_iq_error(id=msgid)
+            iq_stanza = self._xmppclient.make_iq_error(id=msgid)
         else:
-            iq_stanza = self.make_iq_get()
+            iq_stanza = self._xmppclient.make_iq_get()
         iq_stanza["id"] = msgid
 
         payload = ET.Element("oa")
@@ -507,19 +487,25 @@ class HubConnector(slixmpp.ClientXMPP):
         self._listener_message_received = message_received
 
         # Register our callback.
-        self.register_handler(
+        self._xmppclient.register_handler(
             Callback(
                 "Listener",
-                MatchXPath("{{{0}}}iq/{{{1}}}oa".format(self.default_ns, DEFAULT_NS)),
+                MatchXPath(
+                    "{{{0}}}iq/{{{1}}}oa".format(
+                        self._xmppclient.default_ns, DEFAULT_NS
+                    )
+                ),
                 message_received,
             )
         )
 
-        self.register_handler(
+        self._xmppclient.register_handler(
             Callback(
                 "Listener",
                 MatchXPath(
-                    "{{{0}}}message/{{{1}}}event".format(self.default_ns, DEFAULT_NS)
+                    "{{{0}}}message/{{{1}}}event".format(
+                        self._xmppclient.default_ns, DEFAULT_NS
+                    )
                 ),
                 message_received,
             )
