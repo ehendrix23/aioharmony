@@ -327,7 +327,7 @@ class HarmonyClient:
                         self._get_config(),
                         self._retrieve_hub_info(),
                         self._get_automation_config(),
-                        self._get_automation_commands(),
+                        self._get_automation_devices(),
                         return_exceptions=True,
                     )
             except asyncio.TimeoutError:
@@ -515,7 +515,7 @@ class HarmonyClient:
 
         return self._hub_config.automation_config
 
-    async def _get_automation_commands(self) -> Optional[dict]:
+    async def _get_automation_devices(self) -> Optional[dict]:
         """Retrieves the Harmony automation commands.
 
         Returns:
@@ -563,7 +563,7 @@ class HarmonyClient:
             return None
 
         self._hub_config = self._hub_config._replace(
-            automation_commands=response.get("data")
+            automation_devices=response.get("data")
         )
 
         return self._hub_config.automation_devices
