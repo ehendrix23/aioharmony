@@ -106,7 +106,7 @@ def call_raw_callback(
         )
         partial_func = partial(callback, result)  # type: ignore
         partial_coro = asyncio.coroutine(partial_func)
-        asyncio.ensure_future(partial_coro())
+        asyncio.create_task(partial_coro(), name="Callback " + (callback_name or ""))
         return True
 
     if callable(callback):

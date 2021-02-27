@@ -522,7 +522,11 @@ async def run():
         hub_ips = args.harmony_ip.split(",")
         for hub in hub_ips:
             # Connect to the HUB
-            hub_tasks.append(asyncio.ensure_future(execute_per_hub(hub, args)))
+            hub_tasks.append(
+                asyncio.create_task(
+                    execute_per_hub(hub, args), name="Hub " + hub + " task"
+                )
+            )
 
         results = await asyncio.gather(*hub_tasks, return_exceptions=True)
         for _, result in enumerate(results):
