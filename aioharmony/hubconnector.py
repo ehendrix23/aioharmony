@@ -7,11 +7,14 @@ responses."""
 import asyncio
 import logging
 import socket
-from typing import Optional, Union
+from typing import Optional
 
 import aiohttp
 
-from aioharmony.const import ConnectorCallbackType
+from aioharmony.const import (
+    DEFAULT_WS_HUB_PORT as DEFAULT_HUB_PORT,
+    ConnectorCallbackType,
+)
 
 DEFAULT_DOMAIN = "svcs.myharmony.com"
 DEFAULT_TIMEOUT = 5
@@ -96,9 +99,24 @@ class HubConnector:
 
     async def hub_send(
         self, command, params, get_timeout: Optional[int], msgid=None, post=False
-    ) -> Optional[Union[asyncio.Future, str]]:
+    ) -> Optional[asyncio.Task]:
         """Send a payload request to Harmony Hub and return json response."""
-        raise NotImplementedError
+
+        if post:
+            url = "http://{}:{}/".format(self._ip_address, DEFAULT_HUB_PORT)
+            headers = {
+                "Origin": "http://sl.dhg.myharmony.com",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Accept-Charset": "utf-8",
+            }
+            json_request = {"id ": msgid, "cmd": command, "params": {}}
+            response = asyncio.create_task(
+                self.hub_post(url, json_request, headers), name="Post " + command
+            )
+            return response
+
+        return None
 
     async def hub_post(self, url, json_request, headers=None) -> Optional[dict]:
         """Post a json request and return the response."""

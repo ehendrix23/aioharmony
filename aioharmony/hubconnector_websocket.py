@@ -144,8 +144,8 @@ class HubConnector_websockets(HubConnector):
 
             # Now put the listener on the loop.
             if not self._listener_task:
-                self._listener_task = asyncio.ensure_future(
-                    self._listener(self._websocket)
+                self._listener_task = asyncio.create_task(
+                    self._listener(self._websocket), name="WebSockets Listener"
                 )
 
             # Set connected to True, disconnect sets this to False to
@@ -254,16 +254,13 @@ class HubConnector_websockets(HubConnector):
             msgid = str(uuid4())
 
         if post:
-            url = "http://{}:{}/".format(self._ip_address, DEFAULT_HUB_PORT)
-            headers = {
-                "Origin": "http://sl.dhg.myharmony.com",
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "Accept-Charset": "utf-8",
-            }
-            json_request = {"id ": msgid, "cmd": command, "params": {}}
-            response = asyncio.ensure_future(self.hub_post(url, json_request, headers))
-            return response
+            return await super().hub_send(
+                command=command,
+                params=params,
+                get_timeout=get_timeout,
+                msgid=msgid,
+                post=post,
+            )
 
         # Make sure we're connected.
         if not await self.hub_connect():
@@ -353,11 +350,14 @@ class HubConnector_websockets(HubConnector):
                                     # Value is a JSON response.
                                     try:
                                         value2 = json.loads(value2)
-                                    except json.JSONDecodeError:
+                                    except json.JSONDecodeError as err:
                                         _LOGGER.debug(
-                                            "%s: JSON decoding error with %s",
+                                            "%s: JSON decoding error %s at line %s and column %s. Document: %s",
                                             self._ip_address,
-                                            value2,
+                                            err.msg,
+                                            err.lineno,
+                                            err.colno,
+                                            err.doc,
                                         )
                                         pass
                             value.update({key2: value2})

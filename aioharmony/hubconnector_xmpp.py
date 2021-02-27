@@ -7,7 +7,7 @@ responses."""
 import asyncio
 import json
 import logging
-from typing import Optional
+from typing import Optional, Union
 from uuid import uuid4
 
 from async_timeout import timeout
@@ -317,8 +317,21 @@ class HubConnector_xmpp(HubConnector):
         get_timeout=None,
         msgid=None,
         post=False,
-    ) -> Optional[str]:
+    ) -> Optional[Union[asyncio.Future, str]]:
         """Send a payload request to Harmony Hub and return json response."""
+
+        if not msgid:
+            msgid = str(uuid4())
+
+        if post:
+            return await super().hub_send(
+                command=command,
+                params=params,
+                get_timeout=get_timeout,
+                msgid=msgid,
+                post=post,
+            )
+
         # Make sure we're connected.
         if not await self.hub_connect():
             return
@@ -330,9 +343,6 @@ class HubConnector_xmpp(HubConnector):
                 future_result.result()
             except IqTimeout:
                 pass
-
-        if not msgid:
-            msgid = str(uuid4())
 
         if iq_type == "query":
             iq_stanza = self._xmppclient.make_iq_query()
@@ -383,11 +393,14 @@ class HubConnector_xmpp(HubConnector):
                     # It is a JSON value. Run it through for decoding.
                     try:
                         value = json.loads(value)
-                    except json.JSONDecodeError:
+                    except json.JSONDecodeError as err:
                         _LOGGER.debug(
-                            "%s: value is not a JSON object: %s",
+                            "%s: JSON decoding error %s at line %s and column %s. Document: %s",
                             self._ip_address,
-                            value,
+                            err.msg,
+                            err.lineno,
+                            err.colno,
+                            err.doc,
                         )
                 dictionary.update({key: value})
 
@@ -405,12 +418,15 @@ class HubConnector_xmpp(HubConnector):
                 if message.text is not None and message.text != "":
                     try:
                         data = json.loads(message.text)
-                    except json.JSONDecodeError:
+                    except json.JSONDecodeError as err:
                         # Should mean only a single value was received.
                         _LOGGER.debug(
-                            "%s: response is not a JSON object: %s",
+                            "%s: JSON decoding error %s at line %s and column %s. Document: %s",
                             self._ip_address,
-                            message.text,
+                            err.msg,
+                            err.lineno,
+                            err.colno,
+                            err.doc,
                         )
                         pairings = {"{": "}", '"': '"'}
                         have_key = escape = False

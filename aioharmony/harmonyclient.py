@@ -702,7 +702,7 @@ class HarmonyClient:
 
         response = None
         handler_uuid = None  # type: Optional[str]
-        if wait:
+        if wait and not post:
             response = self._loop.create_future()
             resp_handler = Handler(
                 handler_obj=response,
@@ -731,6 +731,9 @@ class HarmonyClient:
             if handler_uuid is not None:
                 self.unregister_handler(handler_uuid=handler_uuid)
             raise aioexc.TimeOut
+
+        if not wait:
+            return True
 
         # If response is None then we would only wait if we received a future back from hub_send.
         if response is None:
