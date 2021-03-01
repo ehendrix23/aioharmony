@@ -11,11 +11,6 @@ from typing import Optional, Union
 from uuid import uuid4
 
 from async_timeout import timeout
-import slixmpp
-from slixmpp.exceptions import IqTimeout
-from slixmpp.xmlstream import ET
-from slixmpp.xmlstream.handler.callback import Callback
-from slixmpp.xmlstream.matcher import MatchXPath
 
 from aioharmony.const import (
     DEFAULT_XMPP_HUB_PORT as DEFAULT_HUB_PORT,
@@ -25,6 +20,26 @@ import aioharmony.exceptions as aioexc
 from aioharmony.helpers import call_callback
 from aioharmony.hubconnector import HubConnector
 
+# Prevent warning message for slixmpp.stringprep about using slower stringprep.
+slixmpp_level = logging.getLogger("slixmpp").getEffectiveLevel()
+if slixmpp_level == logging.WARNING:
+    logging.getLogger("slixmpp").setLevel(logging.ERROR)
+
+# For these we need to ignore flake8 E402 (PEP8, import not at top of file).
+import slixmpp  # noqa: E402
+from slixmpp.exceptions import IqTimeout  # noqa: E402
+from slixmpp.xmlstream import ET  # noqa: E402
+from slixmpp.xmlstream.handler.callback import Callback  # noqa: E402
+from slixmpp.xmlstream.matcher import MatchXPath  # noqa: E402
+
+# Now set it back to what it was.
+logging.getLogger("slixmpp").setLevel(slixmpp_level)
+
+# Set log level for slixmpp.basexmpp to ERROR to prevent warning about using Legacy XMPP 0.9 protocol detected.
+slixmpp_level = logging.getLogger("slixmpp.basexmpp").getEffectiveLevel()
+if slixmpp_level == logging.WARNING:
+    logging.getLogger("slixmpp.basexmpp").setLevel(logging.ERROR)
+
 DEFAULT_DOMAIN = "svcs.myharmony.com"
 DEFAULT_TIMEOUT = 5
 DEFAULT_USER = "user@connect.logitech.com/gatorade."
@@ -32,7 +47,6 @@ DEFAULT_PASSWORD = "password"
 DEFAULT_NS = "connect.logitech.com"
 
 _LOGGER = logging.getLogger(__name__)
-
 
 # TODO: Add docstyle comments
 # TODO: Clean up code styling
