@@ -176,6 +176,8 @@ Release Notes
     - Fixed: Registered handlers would not be unregistered after a timeout when sending commands to HUB.
     - Updated slixmpp from >= 1.5.2 to >= 1.7.0
     - Updated aiohttp from >= 3.4  to 3.7.3
+0.2.8
+    - Changed: Get remote_id from Hub without creating websocket connection
 
 
 TODO
