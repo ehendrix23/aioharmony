@@ -133,8 +133,7 @@ class HarmonyClient:
         if not self._protocol == WEBSOCKETS :
             try:
                 _, _ = await asyncio.open_connection(host=self._ip_address,
-                                                     port=DEFAULT_XMPP_HUB_PORT,
-                                                     loop=self._loop
+                                                     port=DEFAULT_XMPP_HUB_PORT
                                                      )
             except ConnectionRefusedError:
                 if self._protocol == XMPP:
