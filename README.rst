@@ -178,7 +178,8 @@ Release Notes
     - Updated aiohttp from >= 3.4  to 3.7.3
 0.2.8
     - Changed: Get remote_id from Hub without creating websocket connection
-
+0.2.9
+    - Fixed: Fixed exception in Pythin 3.10 by removing loop parameter (swolix)
 
 TODO
 ----
