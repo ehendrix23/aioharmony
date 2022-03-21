@@ -236,6 +236,53 @@ async def send_command(client, args):
     else:
         print(f"HUB: {client.name} Command Sent")
 
+async def send_commands(client, args):
+    """Connects to the Harmony and send a series of simple commands.
+
+    Args:
+        args (argparse): Argparse object containing required variables from
+        command line
+
+    """
+    device_id = None
+    if args.device_id.isdigit():
+        if client.get_device_name(int(args.device_id)):
+            device_id = args.device_id
+
+    if device_id is None:
+        device_id = client.get_device_id(str(args.device_id).strip())
+
+    if device_id is None:
+        print(f"HUB: {client.name} Device {args.device_id} is invalid.")
+        return
+
+    snd_cmmnd_list = []
+    words = args.commands.split()
+    for single_command in words:
+        if single_command.isspace():
+            continue
+        print(f"ADDING COMMAND: {single_command}")
+        snd_cmmnd = SendCommandDevice(
+            device=device_id,
+            command=single_command,
+            delay=args.hold_secs)
+        snd_cmmnd_list.append(snd_cmmnd)
+        if args.delay_secs > 0:
+            snd_cmmnd_list.append(args.delay_secs)
+
+    result_list = await client.send_commands(snd_cmmnd_list)
+
+    if result_list:
+        for result in result_list:
+            print("HUB: {} Sending of command {} to device {} failed with code {}: "
+                  "{}".format(
+                      client.name,
+                      result.command.command,
+                      result.command.device,
+                      result.code,
+                      result.msg))
+    else:
+        print(f"HUB: {client.name} Commands Sent")
 
 async def change_channel(client, args):
     """Change channel
@@ -434,6 +481,23 @@ async def run():
         help='Number of seconds to "hold" before releasing. Defaults to 0.4'
              'seconds')
     command_parser.set_defaults(func=send_command)
+
+    command_parser = subparsers.add_parser(
+        'send_commands', help='Send a series of simple commands separated by spaces.')
+    command_parser.add_argument(
+        '--device_id',
+        help='Specify the device id to which we will send the command.')
+    command_parser.add_argument(
+        '--commands', help='Space-separated IR Commands to send to the device.')
+    command_parser.add_argument(
+        '--delay_secs', type=float, default=0.4,
+        help='Delay between sending commands. Not used if only '
+             'sending a single command. Defaults to 0.4 seconds')
+    command_parser.add_argument(
+        '--hold_secs', type=float, default=0,
+        help='Number of seconds to "hold" before releasing. Defaults to 0.4'
+             'seconds')
+    command_parser.set_defaults(func=send_commands)
 
     change_channel_parser = subparsers.add_parser(
         'change_channel', help='Change the channel')
