@@ -62,6 +62,7 @@ Usage
                             foractivities otherwise only current activity will be
                             shown.
         send_command        Send a simple command.
+        send_commands       Send a series of simple commands separated by spaces.
         change_channel      Change the channel
 
     optional arguments:
