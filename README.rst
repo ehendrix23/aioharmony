@@ -180,7 +180,10 @@ Release Notes
 0.2.8
     - Changed: Get remote_id from Hub without creating websocket connection
 0.2.9
-    - Fixed: Fixed exception in Pythin 3.10 by removing loop parameter (swolix)
+    - Fixed: Fixed exception in Python 3.10 by removing loop parameter (swolix)
+0.2.10
+    - Fixed: Fixed "module asyncio has no attribute coroutine" exception in call_raw_callback function on Python 3.11
+    - Changed: Bumped minimum required Python version to 3.9
 
 TODO
 ----
