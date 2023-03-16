@@ -104,9 +104,14 @@ def call_raw_callback(callback: CallbackType,
         _LOGGER.debug("Scheduling coroutine %s with UUID %s",
                       callback_name,
                       callback_uuid)
-        partial_func = partial(callback, result)
-        partial_coro = asyncio.coroutine(partial_func)
-        asyncio.ensure_future(partial_coro())
+
+        def async_partial(async_fn, *args):
+            async def wrapped():
+                return await async_fn(*args)
+            return wrapped
+
+        partial_func = async_partial(callback, result)
+        asyncio.ensure_future(partial_func())
         return True
 
     if callable(callback):
@@ -115,7 +120,7 @@ def call_raw_callback(callback: CallbackType,
         # to block the loop.
         _LOGGER.debug("Calling callback %s with UUID %s",
                       callback_name,
-                      callback_uuid)
+                      callback_uuid)        
         func = partial(callback, result)
         func()
         return True
