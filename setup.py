@@ -20,7 +20,7 @@ DESCRIPTION = 'Asyncio Python library for connecting to and controlling the ' \
 URL = 'https://github.com/ehendrix23/aioharmony'
 EMAIL = 'hendrix_erik@hotmail.com'
 AUTHOR = 'Erik Hendrix'
-REQUIRES_PYTHON = '>=3.5.3'
+REQUIRES_PYTHON = '>=3.9'
 VERSION = None
 
 # What packages are required for this module to be executed?
