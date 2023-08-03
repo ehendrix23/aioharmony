@@ -291,7 +291,7 @@ class HubConnector:
                 "cmd": command,
                 "params": {}
             }
-            response = asyncio.ensure_future(self.hub_post(url, json_request, headers))
+            response = await self.hub_post(url, json_request, headers)
             return response
 
         # Make sure we're connected.

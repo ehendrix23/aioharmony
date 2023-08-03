@@ -6,13 +6,14 @@ This only contains some helper routines that are used.
 
 import asyncio
 import logging
-from typing import List, Optional
+from typing import List, Optional, Set
 from functools import partial
 
 from aioharmony.handler import CallbackType
 
 _LOGGER = logging.getLogger(__name__)
 
+_CALLBACK_TASKS: Set[asyncio.Task] = set()
 
 # pylint: disable=broad-except
 def call_callback(callback_handler: CallbackType,
@@ -111,7 +112,9 @@ def call_raw_callback(callback: CallbackType,
             return wrapped
 
         partial_func = async_partial(callback, result)
-        asyncio.ensure_future(partial_func())
+        task = asyncio.ensure_future(partial_func())
+        _CALLBACK_TASKS.add(task)
+        task.add_done_callback(_CALLBACK_TASKS.discard, task)
         return True
 
     if callable(callback):
